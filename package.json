@@ -4,23 +4,53 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "worker": "tsx src/worker.ts",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "db:migrate": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "render:sample": "tsx scripts/render-sample.ts",
+    "trigger:discovery": "tsx scripts/trigger-discovery.ts",
+    "import:html": "tsx scripts/import-html.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "@remotion/bundler": "^4.0.517",
+    "@remotion/cli": "^4.0.517",
+    "argon2": "^0.45.1",
+    "bullmq": "^6.2.1",
+    "cheerio": "^1.2.0",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.10",
+    "lucide-react": "^1.34.0",
     "next": "16.3.3",
+    "openai": "^7.9.0",
+    "puppeteer-core": "^25.9.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "remotion": "^4.0.517",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
+    "@types/argon2": "^0.14.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.12",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Product {
+  id                   String   @id @default(cuid())
+  marketplace          String   @default("MERCADO_LIBRE")
+  externalId           String?
+  siteId               String   @default("MLA")
+  title                String
+  categoryId           String?
+  price                Decimal?
+  currencyId           String?
+  originalPermalink    String
+  affiliateUrl         String?
+  primaryImageUrl      String?
+  attributesJson       Json?
+  sellerId             String?
+  sellerReputation     String?
+  status               ProductStatus @default(CANDIDATE)
+  
+  // Scoring Fields
+  opportunityScore     Int?
+  priceTier            String?
+  problemSolved        String?
+  reelHook             String?
+  explanationDifficulty String?
+  selectionReasons     Json?
+
+  lastMarketplaceSyncAt DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  drafts               ContentDraft[]
+
+  @@unique([marketplace, externalId])
+}
+
+enum ProductStatus {
+  CANDIDATE
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model ContentDraft {
+  id                  String   @id @default(cuid())
+  productId           String
+  product             Product  @relation(fields: [productId], references: [id])
+  hook                String?
+  benefitsJson        Json?    // list of exactly 3 measurable benefits
+  disclaimer          String?
+  caption             String?
+  hashtagsJson        Json?
+  cta                 String?
+  priceSnapshot       Decimal?
+  currencySnapshot    String?
+  template            String   @default("STATIC_CARDS_V1")
+  status              DraftStatus @default(DRAFT)
+  validationErrorsJson Json?
+  approvedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  assets              MediaAsset[]
+  publications        Publication[]
+}
+
+enum DraftStatus {
+  DRAFT
+  GENERATING
+  READY
+  APPROVED
+  REJECTED
+  PUBLISHING
+  PUBLISHED
+  ERROR
+}
+
+model MediaAsset {
+  id             String   @id @default(cuid())
+  contentDraftId String
+  draft          ContentDraft @relation(fields: [contentDraftId], references: [id])
+  kind           AssetKind
+  localPath      String?
+  publicUrl      String?
+  mimeType       String
+  width          Int?
+  height         Int?
+  durationSeconds Float?
+  checksum       String?
+  createdAt      DateTime @default(now())
+}
+
+enum AssetKind {
+  SOURCE_IMAGE
+  COVER
+  REEL
+}
+
+model Publication {
+  id                  String   @id @default(cuid())
+  contentDraftId      String
+  draft               ContentDraft @relation(fields: [contentDraftId], references: [id])
+  platform            String   @default("INSTAGRAM")
+  scheduledFor        DateTime?
+  publishedAt         DateTime?
+  externalContainerId String?
+  externalMediaId     String?
+  externalPermalink   String?
+  status              PublicationStatus @default(QUEUED)
+  attemptCount        Int      @default(0)
+  lastErrorCode       String?
+  lastErrorMessage    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+enum PublicationStatus {
+  QUEUED
+  UPLOADING
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
+
+model JobExecution {
+  id           String   @id @default(cuid())
+  jobName      String
+  entityType   String?
+  entityId     String?
+  status       JobStatus
+  inputJson    Json?
+  outputJson   Json?
+  errorMessage String?
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime?
+}
+
+enum JobStatus {
+  STARTED
+  SUCCEEDED
+  FAILED
+}
+
+model HtmlImportJob {
+  id               String   @id @default(cuid())
+  filename         String
+  status           String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, ERROR
+  productsFound    Int      @default(0)
+  productsImported Int      @default(0)
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // INFO, WARN, ERROR
+  source    String   // e.g., 'instagram_publish', 'mercadolibre_sync'
+  message   String
+  details   Json?
+  createdAt DateTime @default(now())
+}
