@@ -16,6 +16,8 @@ export default function InstagramPublishButton({ productId, isPublished }: { pro
     const result = await publishToInstagramAction([productId]);
     if (result && !result.success) {
       alert(`Error al publicar: ${result.message}`);
+    } else {
+      alert('✅ ¡Producto publicado con éxito en Instagram!');
     }
     setIsProcessing(false);
     router.refresh();
@@ -28,6 +30,8 @@ export default function InstagramPublishButton({ productId, isPublished }: { pro
     const result = await unpublishFromInstagramAction([productId]);
     if (result && !result.success) {
       alert(`Error al despublicar: ${result.message}`);
+    } else {
+      alert('🗑️ Producto desvinculado de Instagram correctamente.');
     }
     setIsProcessing(false);
     router.refresh();

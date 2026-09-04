@@ -56,6 +56,7 @@ export default function ProductTable({ products, total, page, totalPages, search
     if (result && !result.success) {
       alert(`Error al publicar: ${result.message}`);
     } else {
+      alert(`✅ ¡${selectedIds.size} producto(s) publicado(s) con éxito en Instagram!`);
       setSelectedIds(new Set());
     }
     setIsProcessing(false);
