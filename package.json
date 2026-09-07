@@ -21,6 +21,7 @@
     "@prisma/client": "^6.19.3",
     "@remotion/bundler": "^4.0.517",
     "@remotion/cli": "^4.0.517",
+    "@upstash/qstash": "^2.11.3",
     "argon2": "^0.45.1",
     "bullmq": "^6.2.1",
     "cheerio": "^1.2.0",

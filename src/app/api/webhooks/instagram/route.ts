@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processInstagramComment, processInstagramDirectMessage } from '@/lib/instagram-bot';
+import { enqueueInstagramJob } from '@/lib/queue/instagram-queue';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * Recepción de eventos en tiempo real (Comentarios, DMs)
+ * Encola las tareas inmediatamente para responder 200 OK a Meta en <50ms
  */
 export async function POST(request: NextRequest) {
   try {
@@ -38,10 +39,8 @@ export async function POST(request: NextRequest) {
         if (Array.isArray(entry.changes)) {
           for (const change of entry.changes) {
             if (change.field === 'comments') {
-              // Procesamos el comentario de forma asíncrona
-              processInstagramComment(change).catch(err => {
-                console.error('[IG Webhook] Error procesando comentario:', err);
-              });
+              // Encolamos en QStash / DB con retardo controlado
+              await enqueueInstagramJob('comment', change);
             }
           }
         }
@@ -49,9 +48,8 @@ export async function POST(request: NextRequest) {
         // 2. Manejo de Mensajes Directos (DMs)
         if (Array.isArray(entry.messaging)) {
           for (const messagingItem of entry.messaging) {
-            processInstagramDirectMessage(messagingItem).catch(err => {
-              console.error('[IG Webhook] Error procesando DM:', err);
-            });
+            // Encolamos en QStash / DB con retardo controlado
+            await enqueueInstagramJob('dm', messagingItem);
           }
         }
       }
