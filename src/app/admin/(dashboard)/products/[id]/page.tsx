@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import CheckAvailabilityButton from './CheckAvailabilityButton';
 import InstagramPublishButton from './InstagramPublishButton';
+import BackButton from './BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +46,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className="max-w-3xl mx-auto bg-white dark:bg-gray-900 shadow-md rounded-lg p-6 border border-gray-200 dark:border-gray-800">
-      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">{product.title}</h1>
+    <div className="max-w-3xl mx-auto">
+      <BackButton />
+      
+      <div className="bg-white dark:bg-gray-900 shadow-md rounded-lg p-6 border border-gray-200 dark:border-gray-800">
+        <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">{product.title}</h1>
       
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div>
@@ -108,6 +112,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           Save & Activate
         </button>
       </form>
+      </div>
     </div>
   );
 }

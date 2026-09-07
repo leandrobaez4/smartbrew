@@ -36,6 +36,14 @@ export default function ProductTable({ products, total, page, totalPages, search
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewProduct, setPreviewProduct] = useState<ProductData | null>(null);
 
+  // Armamos la URL actual con todos los filtros para poder volver exactamente a este estado
+  const currentParams = new URLSearchParams();
+  if (page > 1) currentParams.set('page', page.toString());
+  if (search) currentParams.set('search', search);
+  if (statusFilter && statusFilter !== 'ALL') currentParams.set('status', statusFilter);
+  const currentQueryString = currentParams.toString();
+  const backUrl = `/admin/products${currentQueryString ? `?${currentQueryString}` : ''}`;
+
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
@@ -165,7 +173,10 @@ export default function ProductTable({ products, total, page, totalPages, search
                         <ExternalLink size={15} />
                         <span>ML</span>
                       </a>
-                      <Link href={`/admin/products/${product.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
+                      <Link 
+                        href={`/admin/products/${product.id}?from=${encodeURIComponent(backUrl)}`} 
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                      >
                         Edit
                       </Link>
                     </div>
@@ -241,6 +252,7 @@ export default function ProductTable({ products, total, page, totalPages, search
       {/* Product Preview & Availability Modal */}
       <ProductPreviewModal 
         product={previewProduct} 
+        fromUrl={backUrl}
         onClose={() => setPreviewProduct(null)} 
       />
     </div>

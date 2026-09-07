@@ -24,10 +24,11 @@ import {
 
 interface ProductPreviewModalProps {
   product: ProductData | null;
+  fromUrl?: string;
   onClose: () => void;
 }
 
-export default function ProductPreviewModal({ product, onClose }: ProductPreviewModalProps) {
+export default function ProductPreviewModal({ product, fromUrl, onClose }: ProductPreviewModalProps) {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<ProductStatus | null>(product?.status || null);
@@ -273,7 +274,7 @@ export default function ProductPreviewModal({ product, onClose }: ProductPreview
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
           <Link
-            href={`/admin/products/${product.id}`}
+            href={`/admin/products/${product.id}${fromUrl ? `?from=${encodeURIComponent(fromUrl)}` : ''}`}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
           >
             <Edit size={14} />
