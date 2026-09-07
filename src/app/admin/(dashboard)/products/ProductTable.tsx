@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ProductStatus } from '@prisma/client';
-import { Camera, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
+import { Camera, Trash2, CheckCircle2, Loader2, Eye, ExternalLink } from 'lucide-react';
 import { publishToInstagramAction, unpublishFromInstagramAction } from './actions';
+import ProductPreviewModal from './ProductPreviewModal';
 
-type ProductData = {
+export type ProductData = {
   id: string;
   title: string;
   externalId: string | null;
@@ -16,6 +17,8 @@ type ProductData = {
   price: number | null;
   currencyId: string | null;
   primaryImageUrl: string | null;
+  originalPermalink: string;
+  affiliateUrl: string | null;
   createdAt: Date;
   isPublished: boolean;
 };
@@ -31,6 +34,7 @@ export default function ProductTable({ products, total, page, totalPages, search
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState<ProductData | null>(null);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
@@ -107,12 +111,16 @@ export default function ProductTable({ products, total, page, totalPages, search
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                    <div 
+                      className="flex items-center cursor-pointer group"
+                      onClick={() => setPreviewProduct(product)}
+                      title="Click para ver vista previa y disponibilidad"
+                    >
                       {product.primaryImageUrl && (
-                        <img src={product.primaryImageUrl} alt="" className="h-10 w-10 rounded-full mr-3 object-cover border border-gray-200 dark:border-gray-700" />
+                        <img src={product.primaryImageUrl} alt="" className="h-10 w-10 rounded-lg mr-3 object-cover border border-gray-200 dark:border-gray-700 group-hover:opacity-80 transition-opacity" />
                       )}
                       <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-xs" title={product.title}>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-xs group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={product.title}>
                           {product.title}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{product.externalId} ({product.marketplace})</div>
@@ -138,7 +146,29 @@ export default function ProductTable({ products, total, page, totalPages, search
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <Link href={`/admin/products/${product.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">Edit</Link>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setPreviewProduct(product)}
+                        className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        title="Vista previa y disponibilidad"
+                      >
+                        <Eye size={16} />
+                        <span>Previa</span>
+                      </button>
+                      <a 
+                        href={product.originalPermalink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                        title="Verificar directamente en Mercado Libre"
+                      >
+                        <ExternalLink size={15} />
+                        <span>ML</span>
+                      </a>
+                      <Link href={`/admin/products/${product.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300">
+                        Edit
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -207,6 +237,12 @@ export default function ProductTable({ products, total, page, totalPages, search
           </div>
         </div>
       )}
+
+      {/* Product Preview & Availability Modal */}
+      <ProductPreviewModal 
+        product={previewProduct} 
+        onClose={() => setPreviewProduct(null)} 
+      />
     </div>
   );
 }

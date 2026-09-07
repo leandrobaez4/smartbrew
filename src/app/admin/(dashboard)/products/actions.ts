@@ -232,3 +232,18 @@ export async function verifyInstagramPublicationAction(productId: string) {
     return { success: false, message: error.message };
   }
 }
+
+export async function updateProductStatusAction(productId: string, status: 'CANDIDATE' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED') {
+  try {
+    await prisma.product.update({
+      where: { id: productId },
+      data: { status }
+    });
+    revalidatePath('/admin/products');
+    revalidatePath(`/admin/products/${productId}`);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+}
+

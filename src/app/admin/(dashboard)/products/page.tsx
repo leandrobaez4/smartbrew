@@ -55,6 +55,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       price: p.price ? Number(p.price) : null,
       currencyId: p.currencyId,
       primaryImageUrl: p.primaryImageUrl,
+      originalPermalink: p.originalPermalink,
+      affiliateUrl: p.affiliateUrl,
       createdAt: p.createdAt,
       isPublished
     };
