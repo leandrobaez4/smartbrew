@@ -14,28 +14,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="flex-1 p-4 space-y-2">
           <Link href="/admin/products" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <Package size={20} />
-            <span>Products</span>
+            <span>Productos</span>
           </Link>
           <Link href="/admin/imports" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <FileText size={20} />
-            <span>HTML Imports</span>
+            <span>Importaciones HTML</span>
           </Link>
           <Link href="/admin/drafts" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <FileText size={20} />
-            <span>Drafts</span>
+            <span>Borradores</span>
           </Link>
           <Link href="/admin/publications" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <Share2 size={20} />
-            <span>Publications</span>
+            <span>Publicaciones</span>
           </Link>
           <Link href="/admin/logs" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-            <span>System Logs</span>
+            <span>Registros del Sistema</span>
           </Link>
         </nav>
         <div className="p-4 border-t border-gray-200 dark:border-gray-800">
           <form action={logoutAction}>
-            <button type="submit" className="w-full text-left text-sm text-red-600 dark:text-red-400 font-medium hover:text-red-700 dark:hover:text-red-300">Log out</button>
+            <button type="submit" className="w-full text-left text-sm text-red-600 dark:text-red-400 font-medium hover:text-red-700 dark:hover:text-red-300">Cerrar sesión</button>
           </form>
         </div>
       </aside>

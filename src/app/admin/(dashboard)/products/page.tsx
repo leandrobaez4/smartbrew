@@ -65,9 +65,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Products</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Productos</h1>
         <Link href="/admin/products/import" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-          Import Candidate
+          Importar Producto
         </Link>
       </div>
 

@@ -58,11 +58,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </div>
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Price</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Precio</h3>
             <p className="mt-1 text-lg text-gray-900 dark:text-gray-100">${product.price?.toString()} {product.currencyId}</p>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Original Link</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Enlace Original de Mercado Libre</h3>
             <a href={product.originalPermalink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline break-all">
               {product.originalPermalink}
             </a>
@@ -75,10 +75,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       </div>
 
       <form action={updateAffiliateUrl} className="border-t border-gray-200 dark:border-gray-800 pt-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Affiliate Configuration</h2>
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Configuración de Afiliado</h2>
         
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Affiliate URL</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Enlace de Afiliado</label>
           <input 
             type="url" 
             name="affiliateUrl" 
@@ -107,9 +107,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
         <button 
           type="submit" 
-          className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+          className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
         >
-          Save & Activate
+          Guardar y Activar
         </button>
       </form>
       </div>

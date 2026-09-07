@@ -14,7 +14,7 @@ export default async function ImportsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">HTML Imports</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Importaciones HTML</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -68,7 +68,9 @@ export default async function ImportsPage() {
                             ${job.status === 'COMPLETED' ? 'text-green-600 dark:text-green-400' : ''}
                             ${job.status === 'ERROR' ? 'text-red-600 dark:text-red-400' : ''}
                           `}>
-                            {job.status}
+                            {job.status === 'PENDING' ? 'PENDIENTE' : 
+                             job.status === 'PROCESSING' ? 'PROCESANDO' : 
+                             job.status === 'COMPLETED' ? 'COMPLETADO' : 'ERROR'}
                           </span>
                         </div>
                         {job.status === 'ERROR' && job.errorMessage && (

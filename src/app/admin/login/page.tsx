@@ -19,16 +19,17 @@ export default function LoginPage() {
 
         <form action={formAction} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300">Email</label>
+            <label className="block text-sm font-medium text-gray-300">Correo electrónico</label>
             <input 
               name="email" 
               type="email" 
               required 
+              placeholder="tu@email.com"
               className="mt-1 block w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-gray-100 shadow-sm placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" 
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300">Password</label>
+            <label className="block text-sm font-medium text-gray-300">Contraseña</label>
             <input 
               name="password" 
               type="password" 
@@ -39,9 +40,9 @@ export default function LoginPage() {
           <button 
             type="submit" 
             disabled={isPending}
-            className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50"
+            className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 transition-colors"
           >
-            {isPending ? 'Logging in...' : 'Log in'}
+            {isPending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
       </div>
