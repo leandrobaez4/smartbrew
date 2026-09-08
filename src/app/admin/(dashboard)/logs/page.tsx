@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import QueueTester from './QueueTester';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ export default async function LogsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Registros del Sistema</h1>
+
+      <QueueTester />
 
       <div className="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
         <div className="overflow-x-auto">

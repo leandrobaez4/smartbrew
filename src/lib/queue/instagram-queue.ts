@@ -21,7 +21,10 @@ export async function enqueueInstagramJob(type: InstagramJobType, data: any) {
   const driver = process.env.INSTAGRAM_QUEUE_DRIVER || 'qstash';
   const qstashToken = process.env.QSTASH_TOKEN;
   const appUrl = process.env.APP_URL || 'https://smartbrew-baez3.vercel.app';
-  const destinationUrl = `${appUrl}/api/queue/instagram-process`;
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  const destinationUrl = bypassSecret 
+    ? `${appUrl}/api/queue/instagram-process?x-vercel-protection-bypass=${bypassSecret}`
+    : `${appUrl}/api/queue/instagram-process`;
 
   const payload: InstagramJobPayload = {
     type,
@@ -36,10 +39,15 @@ export async function enqueueInstagramJob(type: InstagramJobType, data: any) {
     } else {
       try {
         const client = new Client({ token: qstashToken });
+        const headers: Record<string, string> = {};
+        if (bypassSecret) {
+          headers['x-vercel-protection-bypass'] = bypassSecret;
+        }
 
         // Publicamos a QStash con retardo de 2 segundos para evitar rate-limits de Meta y simular respuesta humana
         const response = await client.publishJSON({
           url: destinationUrl,
+          headers,
           body: payload,
           delay: '2s',
           retries: 3,
