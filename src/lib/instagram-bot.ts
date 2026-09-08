@@ -15,7 +15,8 @@ export async function sendInstagramPrivateReply(commentId: string, text: string)
     throw new Error('Falta INSTAGRAM_ACCESS_TOKEN en las variables de entorno');
   }
 
-  const url = `${baseUrl}/${version}/me/messages`;
+  const accountId = process.env.INSTAGRAM_ACCOUNT_ID || 'me';
+  const url = `${baseUrl}/${version}/${accountId}/messages`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -48,7 +49,8 @@ export async function sendInstagramDirectMessage(recipientId: string, text: stri
     throw new Error('Falta INSTAGRAM_ACCESS_TOKEN en las variables de entorno');
   }
 
-  const url = `${baseUrl}/${version}/me/messages`;
+  const accountId = process.env.INSTAGRAM_ACCOUNT_ID || 'me';
+  const url = `${baseUrl}/${version}/${accountId}/messages`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
