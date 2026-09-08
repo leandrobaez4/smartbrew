@@ -38,7 +38,10 @@ export async function enqueueInstagramJob(type: InstagramJobType, data: any) {
       console.warn('[Queue] Driver QStash seleccionado pero falta QSTASH_TOKEN en .env. Fallback automático a driver DB.');
     } else {
       try {
-        const client = new Client({ token: qstashToken });
+        const client = new Client({ 
+          token: qstashToken,
+          baseUrl: process.env.QSTASH_URL || undefined,
+        });
         const headers: Record<string, string> = {};
         if (bypassSecret) {
           headers['x-vercel-protection-bypass'] = bypassSecret;
