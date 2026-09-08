@@ -156,7 +156,8 @@ export async function processInstagramComment(change: any) {
 
   // Armamos el mensaje
   let messageText = '';
-  const catalogUrl = `${process.env.APP_URL || 'https://smartbrew-baez3.vercel.app'}/productos`;
+  const cleanAppUrl = (process.env.APP_URL || 'https://smartbrew-baez3.vercel.app').replace(/\/+$/, '');
+  const catalogUrl = `${cleanAppUrl}/productos`;
 
   if (product && product.affiliateUrl) {
     messageText = `¡Hola @${fromUsername}! 👋\n\nAcá tenés el enlace oficial con descuento para comprar "${product.title}":\n\n👉 ${product.affiliateUrl}\n\n¡Cualquier duda avisanos!`;
@@ -203,7 +204,8 @@ export async function processInstagramDirectMessage(messagingItem: any) {
   const messageText = (message.text || '').toLowerCase().trim();
   console.log(`[IG Webhook] DM recibido de ${senderId}: "${messageText}"`);
 
-  const catalogUrl = `${process.env.APP_URL || 'https://smartbrew-baez3.vercel.app'}/productos`;
+  const cleanAppUrl = (process.env.APP_URL || 'https://smartbrew-baez3.vercel.app').replace(/\/+$/, '');
+  const catalogUrl = `${cleanAppUrl}/productos`;
 
   // Intentamos buscar si mencionó alguna palabra clave de un producto activo
   let matchedProduct = null;

@@ -20,7 +20,8 @@ export interface InstagramJobPayload {
 export async function enqueueInstagramJob(type: InstagramJobType, data: any) {
   const driver = process.env.INSTAGRAM_QUEUE_DRIVER || 'qstash';
   const qstashToken = process.env.QSTASH_TOKEN;
-  const appUrl = process.env.APP_URL || 'https://smartbrew-baez3.vercel.app';
+  const rawAppUrl = process.env.APP_URL || 'https://smartbrew-baez3.vercel.app';
+  const appUrl = rawAppUrl.replace(/\/+$/, '');
   const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   const destinationUrl = bypassSecret 
     ? `${appUrl}/api/queue/instagram-process?x-vercel-protection-bypass=${bypassSecret}`
