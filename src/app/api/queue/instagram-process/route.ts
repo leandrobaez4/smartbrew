@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Receiver } from '@upstash/qstash';
 import { processInstagramComment, processInstagramDirectMessage } from '@/lib/instagram-bot';
 import { InstagramJobPayload } from '@/lib/queue/instagram-queue';
+import { getMetaErrorDetails } from '@/lib/meta-api';
+import { logSystemEvent } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,9 +59,25 @@ export async function POST(request: NextRequest) {
       type: payload.type,
       processedAt: new Date().toISOString() 
     }, { status: 200 });
-  } catch (error: any) {
-    console.error('[Queue Consumer] Error procesando tarea de la cola:', error);
+  } catch (error: unknown) {
+    const details = getMetaErrorDetails(error);
+    const messageId = request.headers.get('upstash-message-id');
+    const retried = request.headers.get('upstash-retried');
+    console.error('[Queue Consumer] Error procesando tarea de la cola:', {
+      messageId,
+      retried,
+      ...details,
+    });
+    await logSystemEvent('ERROR', 'queue_qstash_failed', `Falló el procesamiento de un mensaje QStash: ${String(details.message)}`, {
+      messageId,
+      retried,
+      ...details,
+    });
     // Retornamos 500 para que QStash reintente automáticamente según su política
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      error: String(details.message),
+      messageId,
+      retryable: details.retryable,
+    }, { status: 500 });
   }
 }

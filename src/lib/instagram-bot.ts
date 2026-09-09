@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { logSystemEvent } from '@/lib/logger';
+import { getMetaErrorDetails, requestMeta } from '@/lib/meta-api';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +18,7 @@ export async function sendInstagramPrivateReply(commentId: string, text: string)
 
   const accountId = process.env.INSTAGRAM_ACCOUNT_ID || 'me';
   const url = `${baseUrl}/${version}/${accountId}/messages`;
-  const response = await fetch(url, {
+  return requestMeta<{ id?: string }>('enviar respuesta privada a comentario', url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -32,13 +33,6 @@ export async function sendInstagramPrivateReply(commentId: string, text: string)
       }
     })
   });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(`Error enviando Private Reply a comentario ${commentId}: ${data.error?.message || JSON.stringify(data)}`);
-  }
-
-  return data;
 }
 
 /**
@@ -51,7 +45,7 @@ export async function sendInstagramDirectMessage(recipientId: string, text: stri
 
   const accountId = process.env.INSTAGRAM_ACCOUNT_ID || 'me';
   const url = `${baseUrl}/${version}/${accountId}/messages`;
-  const response = await fetch(url, {
+  return requestMeta<{ message_id?: string }>('enviar mensaje directo', url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -66,39 +60,25 @@ export async function sendInstagramDirectMessage(recipientId: string, text: stri
       }
     })
   });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(`Error enviando DM a ${recipientId}: ${data.error?.message || JSON.stringify(data)}`);
-  }
-
-  return data;
 }
 
 /**
  * Responde públicamente a un comentario de Instagram (ej: "¡Te envié el link por privado! 📩")
  */
 export async function sendInstagramPublicCommentReply(commentId: string, text: string) {
-  if (!token) return null;
-
-  try {
-    const url = `${baseUrl}/${version}/${commentId}/replies`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: text
-      })
-    });
-
-    return await response.json();
-  } catch (error) {
-    console.error('No se pudo responder públicamente al comentario:', error);
-    return null;
+  if (!token) {
+    throw new Error('Falta INSTAGRAM_ACCESS_TOKEN en las variables de entorno');
   }
+
+  const url = `${baseUrl}/${version}/${commentId}/replies`;
+  return requestMeta<{ id?: string }>('responder públicamente un comentario', url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message: text })
+  });
 }
 
 /**
@@ -168,8 +148,8 @@ export async function processInstagramComment(change: any) {
     messageText = `¡Hola @${fromUsername}! 👋\n\nPodés ver todos nuestros productos recomendados y enlaces de ofertas acá:\n\n👉 ${catalogUrl}\n\n¡Que lo disfrutes!`;
   }
 
+  // El DM privado es el efecto principal. Si falla, propagamos el error para que QStash reintente.
   try {
-    // 1. Enviar el DM privado con el link de afiliado
     await sendInstagramPrivateReply(commentId, messageText);
     await logSystemEvent('INFO', 'instagram_auto_dm', `Enviado link a @${fromUsername} por comentario "${comment.text}"`, {
       commentId,
@@ -179,13 +159,26 @@ export async function processInstagramComment(change: any) {
       affiliateUrl: product?.affiliateUrl || catalogUrl
     });
 
-    // 2. Responder públicamente al comentario para generar más tracción
-    await sendInstagramPublicCommentReply(commentId, `¡Hola @${fromUsername}! Te enviamos el enlace por mensaje privado 📩`);
-  } catch (error: any) {
-    console.error(`[IG Webhook] Error al responder comentario:`, error.message);
-    await logSystemEvent('ERROR', 'instagram_auto_dm', `Fallo al enviar DM a @${fromUsername}: ${error.message}`, {
+  } catch (error: unknown) {
+    const details = getMetaErrorDetails(error);
+    console.error('[IG Webhook] Error al enviar respuesta privada:', details);
+    await logSystemEvent('ERROR', 'instagram_auto_dm', `Fallo al enviar DM a @${fromUsername}: ${String(details.message)}`, {
       commentId,
-      error: error.message
+      ...details,
+    });
+    throw error;
+  }
+
+  // La respuesta pública es secundaria. Se registra su fallo, pero no se reintenta todo el job
+  // porque eso podría duplicar el DM privado que ya fue entregado.
+  try {
+    await sendInstagramPublicCommentReply(commentId, `¡Hola @${fromUsername}! Te enviamos el enlace por mensaje privado 📩`);
+  } catch (error: unknown) {
+    const details = getMetaErrorDetails(error);
+    console.error('[IG Webhook] Error al responder públicamente:', details);
+    await logSystemEvent('ERROR', 'instagram_public_reply', `Meta rechazó la respuesta pública a @${fromUsername}: ${String(details.message)}`, {
+      commentId,
+      ...details,
     });
   }
 }
@@ -243,11 +236,13 @@ export async function processInstagramDirectMessage(messagingItem: any) {
       senderId,
       matchedProductId: matchedProduct?.id
     });
-  } catch (error: any) {
-    console.error(`[IG Webhook] Error al responder DM:`, error.message);
-    await logSystemEvent('ERROR', 'instagram_dm_reply', `Error respondiendo DM a ${senderId}: ${error.message}`, {
+  } catch (error: unknown) {
+    const details = getMetaErrorDetails(error);
+    console.error('[IG Webhook] Error al responder DM:', details);
+    await logSystemEvent('ERROR', 'instagram_dm_reply', `Error respondiendo DM a ${senderId}: ${String(details.message)}`, {
       senderId,
-      error: error.message
+      ...details,
     });
+    throw error;
   }
 }

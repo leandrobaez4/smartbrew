@@ -3,6 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { logSystemEvent } from '@/lib/logger';
+import { getMetaErrorDetails, requestMeta } from '@/lib/meta-api';
 
 const prisma = new PrismaClient();
 
@@ -28,12 +29,10 @@ async function publishImageToInstagram(imageUrl: string, caption: string) {
   containerFormData.append('caption', caption);
   containerFormData.append('access_token', token);
 
-  const containerRes = await fetch(createContainerUrl, { method: 'POST', body: containerFormData });
-  const containerData = await containerRes.json();
-  
-  if (!containerRes.ok) {
-    throw new Error(`Error en IG API (Media): ${containerData.error?.message || JSON.stringify(containerData)}`);
-  }
+  const containerData = await requestMeta<{ id: string }>('crear contenedor de Instagram', createContainerUrl, {
+    method: 'POST',
+    body: containerFormData,
+  });
   
   const creationId = containerData.id;
 
@@ -43,12 +42,10 @@ async function publishImageToInstagram(imageUrl: string, caption: string) {
   publishFormData.append('creation_id', creationId);
   publishFormData.append('access_token', token);
 
-  const publishRes = await fetch(publishUrl, { method: 'POST', body: publishFormData });
-  const publishData = await publishRes.json();
-  
-  if (!publishRes.ok) {
-    throw new Error(`Error en IG API (Media Publish): ${publishData.error?.message || JSON.stringify(publishData)}`);
-  }
+  const publishData = await requestMeta<{ id: string }>('publicar contenedor de Instagram', publishUrl, {
+    method: 'POST',
+    body: publishFormData,
+  });
   
   return publishData.id; // Este es el externalMediaId
 }
@@ -130,8 +127,9 @@ export async function publishToInstagramAction(productIds: string[]) {
           });
         }
         await logSystemEvent('INFO', 'instagram_publish', `¡Publicado con éxito en Instagram! Media ID: ${externalMediaId}`, { productId, externalMediaId });
-      } catch (igError: any) {
-        await logSystemEvent('ERROR', 'instagram_publish', `Error subiendo a Instagram: ${igError.message}`, { productId, error: igError.message });
+      } catch (igError: unknown) {
+        const details = getMetaErrorDetails(igError);
+        await logSystemEvent('ERROR', 'instagram_publish', `Error subiendo a Instagram: ${String(details.message)}`, { productId, ...details });
         
         // Guardamos el registro como fallido
         if (!existingPub) {
@@ -140,17 +138,17 @@ export async function publishToInstagramAction(productIds: string[]) {
               contentDraftId: draft.id,
               platform: 'INSTAGRAM',
               status: 'FAILED',
-              lastErrorMessage: igError.message
+              lastErrorMessage: String(details.message)
             }
           });
         } else {
           await prisma.publication.update({
             where: { id: existingPub.id },
-            data: { status: 'FAILED', lastErrorMessage: igError.message }
+            data: { status: 'FAILED', lastErrorMessage: String(details.message) }
           });
         }
         
-        throw new Error(`Error en producto ${product.title}: ${igError.message}`);
+        throw new Error(`Error en producto ${product.title}: ${String(details.message)}`);
       }
     }
 
@@ -246,4 +244,3 @@ export async function updateProductStatusAction(productId: string, status: 'CAND
     return { success: false, message: error.message };
   }
 }
-
