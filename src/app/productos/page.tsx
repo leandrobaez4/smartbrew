@@ -72,6 +72,7 @@ export default async function ProductosPage() {
           Algunos enlaces son de afiliado. Podemos recibir una comisión si comprás, sin costo adicional para vos.
           Los precios y la disponibilidad pueden cambiar en Mercado Libre.
         </p>
+        <Link href="/politica-de-privacidad">Política de privacidad</Link>
       </footer>
     </div>
   );

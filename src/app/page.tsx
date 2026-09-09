@@ -170,7 +170,10 @@ export default function Home() {
         <p>Tecnología, gadgets y café para disfrutar todos los días.</p>
         <div className="footer-bottom">
           <span>© {new Date().getFullYear()} SmartBrew</span>
-          <span>Coffee &amp; Technology</span>
+          <div className="footer-links">
+            <Link href="/politica-de-privacidad">Política de privacidad</Link>
+            <span>Coffee &amp; Technology</span>
+          </div>
         </div>
       </footer>
     </main>
