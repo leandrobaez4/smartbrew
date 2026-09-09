@@ -13,17 +13,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SmartBrew",
-  description: "Curaduría de gadgets y accesorios de café",
+  title: "SmartBrew | Tecnología, gadgets y café",
+  description:
+    "Descubrí productos tech, gadgets y accesorios de café seleccionados por SmartBrew para mejorar tu día.",
+  openGraph: {
+    title: "SmartBrew | Coffee & Technology",
+    description:
+      "Tecnología, gadgets y accesorios de café seleccionados para tu rutina.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
-      lang="en"
+      lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }
