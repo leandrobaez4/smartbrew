@@ -61,7 +61,7 @@ export async function enqueueInstagramJob(type: InstagramJobType, data: any) {
         await logSystemEvent('INFO', 'queue_qstash_enqueued', `Tarea de Instagram (${type}) encolada en QStash`, {
           messageId: response.messageId,
           type,
-          destinationUrl
+          destinationUrl: `${new URL(appUrl).origin}/api/queue/instagram-process`
         });
 
         return { success: true, driver: 'qstash', messageId: response.messageId };

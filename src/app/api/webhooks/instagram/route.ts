@@ -1,5 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { enqueueInstagramJob } from '@/lib/queue/instagram-queue';
+import { logSystemEvent } from '@/lib/logger';
+import { describeInstagramWebhook, dispatchInstagramWebhook } from '@/lib/instagram-webhook';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,38 +32,30 @@ export async function GET(request: NextRequest) {
  * Encola las tareas inmediatamente para responder 200 OK a Meta en <50ms
  */
 export async function POST(request: NextRequest) {
+  const requestId = randomUUID();
+  const hostname = request.nextUrl.hostname;
+  const host = ['www.smartbrew.tech', 'smartbrew.tech', 'smartbrew-rouge.vercel.app', 'smartbrew-baez3.vercel.app'].includes(hostname)
+    ? hostname : 'other';
+  const started = Date.now();
+  const audit = (level: 'INFO' | 'WARN' | 'ERROR', source: string, details: Record<string, unknown>) => {
+    const safeDetails = { requestId, host, ...details };
+    console.log(`[IG Webhook] ${source}`, safeDetails);
+    after(() => logSystemEvent(level, source, 'Diagnóstico del webhook de Instagram', safeDetails));
+  };
+  audit('INFO', 'instagram_webhook_received', { stage: 'received' });
+  let stage = 'parse';
   try {
     const body = await request.json();
-
-    // Verificamos que sea un objeto de Instagram
-    if (body.object === 'instagram' && Array.isArray(body.entry)) {
-      for (const entry of body.entry) {
-        // 1. Manejo de comentarios en publicaciones (Feed, Reels, Carruseles)
-        if (Array.isArray(entry.changes)) {
-          for (const change of entry.changes) {
-            if (change.field === 'comments') {
-              // Encolamos en QStash / DB con retardo controlado
-              await enqueueInstagramJob('comment', change);
-            }
-          }
-        }
-
-        // 2. Manejo de Mensajes Directos (DMs)
-        if (Array.isArray(entry.messaging)) {
-          for (const messagingItem of entry.messaging) {
-            // Encolamos en QStash / DB con retardo controlado
-            await enqueueInstagramJob('dm', messagingItem);
-          }
-        }
-      }
-
-      // Meta requiere responder 200 OK inmediatamente para no reintentar
-      return NextResponse.json({ status: 'EVENT_RECEIVED' }, { status: 200 });
-    }
-
-    return NextResponse.json({ status: 'IGNORED' }, { status: 200 });
-  } catch (error: any) {
-    console.error('[IG Webhook] Error parseando payload:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    audit('INFO', 'instagram_webhook_shape', describeInstagramWebhook(body));
+    stage = 'enqueue';
+    const result = await dispatchInstagramWebhook(body, enqueueInstagramJob);
+    audit(result.reason === 'enqueued' ? 'INFO' : 'WARN',
+      result.reason === 'enqueued' ? 'instagram_webhook_enqueued' : 'instagram_webhook_ignored',
+      { ...result, durationMs: Date.now() - started });
+    return NextResponse.json({ status: result.status }, { status: 200 });
+  } catch {
+    // Parser/SDK errors can contain request content or credential-bearing URLs.
+    audit('ERROR', 'instagram_webhook_failed', { stage, reason: stage === 'parse' ? 'invalid_json' : 'enqueue_failed', durationMs: Date.now() - started });
+    return NextResponse.json({ error: 'Webhook processing failed', requestId }, { status: 500 });
   }
 }
