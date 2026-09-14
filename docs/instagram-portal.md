@@ -4,10 +4,30 @@
 
 Accesos por invitación creados en `/admin/instagram`; activación y login en
 `/portal/login`; autorización y perfil en `/portal/instagram`.
-No hay registro público ni envío automático de invitaciones por email.
-Compartir el código de activación por un canal privado: vence en 7 días y se consume
+No hay registro público. Las invitaciones se envían mediante Resend.
+El código de activación vence en 7 días y se consume
 una sola vez para elegir una contraseña. La sesión dura 24 horas. El login admite
 5 intentos por cuenta cada 15 minutos. El administrador puede revocar el acceso.
+
+### Email y listado del administrador
+
+Configurar `RESEND_API_KEY` y `PORTAL_EMAIL_FROM` (por ejemplo,
+`SmartBrew <invitaciones@smartbrew.tech>`) en Vercel Production y redeployar.
+El dominio del remitente debe estar verificado en Resend mediante sus registros DNS.
+Referencia: https://resend.com/docs/knowledge-base/how-do-I-create-an-email-address-or-sender-in-resend
+No se crean invitaciones si falta esta configuración. Volver a enviar al mismo correo
+pendiente genera un código nuevo e invalida el anterior. No reinvita usuarios activos
+ni revocados. No hay envío masivo ni reintentos automáticos.
+Si falla o vence la solicitud a Resend, se conserva la invitación y se ofrece el
+código al administrador como alternativa privada. Una respuesta exitosa significa
+aceptación por Resend, no entrega en la bandeja: revisar entrega/rebotes en su dashboard.
+Probar envío real, spam, activación, reenvío y errores del proveedor antes de darlo
+por operativo. No registrar códigos ni cuerpos de email en logs.
+
+`/admin/instagram` muestra correo, username, ID, última actualización y vencimiento
+de las conexiones actuales del portal, sin consultar ni mostrar tokens. No es un
+historial: desconectar/revocar elimina la conexión. No incluye el bot configurado
+por variables de entorno ni verifica revocaciones remotas en tiempo real.
 
 Los invitados NO son filas de User ni usan la cookie del admin. Cada consulta de
 perfil usa el miembro de la sesión del servidor, nunca un ID proporcionado por el

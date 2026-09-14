@@ -3,17 +3,31 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { portalDb, requireAdmin } from '@/lib/portal';
 import { hashSecret, randomSecret } from '@/lib/portal-crypto';
+import { portalEmailConfig, sendPortalInvitation } from '@/lib/portal-email';
 
 export async function inviteMember(_state: { message: string; code?: string }, form: FormData) {
   await requireAdmin();
   const email = z.string().email().max(254).safeParse(String(form.get('email') || '').trim().toLowerCase());
   if (!email.success) return { message: 'Ingresá un correo válido.' };
+  try { portalEmailConfig(); } catch { return { message: 'Falta configurar RESEND_API_KEY y PORTAL_EMAIL_FROM en Vercel. No se creó ni modificó ninguna invitación.' }; }
   const code = randomSecret();
+  const inviteHash = hashSecret(code);
   try {
-    await portalDb.portalMember.create({ data: { email: email.data, inviteHash: hashSecret(code), inviteExpiresAt: new Date(Date.now() + 7 * 86400000) } });
-  } catch { return { message: 'No se pudo crear. Revisá si el correo ya está invitado.' }; }
+    const existing = await portalDb.portalMember.findUnique({ where: { email: email.data }, select: { id: true, disabled: true, passwordHash: true, inviteHash: true } });
+    const data = { inviteHash, inviteExpiresAt: new Date(Date.now() + 7 * 86400000) };
+    if (existing) {
+      if (existing.disabled || existing.passwordHash) return { message: 'Este usuario ya activó su acceso o fue revocado. No se envió otra invitación.' };
+      const updated = await portalDb.portalMember.updateMany({ where: { id: existing.id, disabled: false, passwordHash: null, inviteHash: existing.inviteHash }, data });
+      if (!updated.count) return { message: 'La invitación cambió. Actualizá la página antes de intentar nuevamente.' };
+    } else await portalDb.portalMember.create({ data: { email: email.data, ...data } });
+  } catch { return { message: 'No se pudo guardar la invitación. Actualizá la página y volvé a intentar.' }; }
   revalidatePath('/admin/instagram');
-  return { message: 'Compartí el código de forma privada. Se muestra solo ahora y vence en 7 días. No se envió ningún email.', code };
+  try {
+    await sendPortalInvitation(email.data, code, inviteHash);
+    return { message: 'Resend aceptó el email para envío. El código vence en 7 días. Revisá la bandeja de entrada y spam; la aceptación no confirma la entrega.' };
+  } catch {
+    return { message: 'La invitación quedó guardada, pero no pudimos confirmar el envío. Podés compartir este código por un canal privado o volver a enviar (se invalidará el código anterior).', code };
+  }
 }
 
 export async function revokeMember(form: FormData) {
