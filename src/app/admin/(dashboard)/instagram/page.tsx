@@ -24,7 +24,7 @@ export default async function InstagramAdmin() {
     <h2 className="text-xl font-semibold">Todos los accesos ({members.length})</h2>
     {members.length === 0 && <p>No hay usuarios invitados.</p>}
     {members.map(m => <div key={m.id} className="border rounded p-4 flex flex-wrap justify-between gap-3"><span>{m.email} · {m.disabled ? 'Revocado' : 'Habilitado'}</span>
-      {!m.disabled && <form action={revokeMember}><input type="hidden" name="memberId" value={m.id} /><button className="text-red-500">Revocar acceso y eliminar conexión guardada</button></form>}
+      {!m.disabled && <form action={revokeMember}><input type="hidden" name="memberId" value={m.id} /><button type="submit" className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-red-700 bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:border-red-800 hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700">Revocar acceso y eliminar conexión guardada</button></form>}
     </div>)}
   </section>;
 }
