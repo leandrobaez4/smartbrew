@@ -15,7 +15,7 @@ it('sends a plain-text invitation with a stable idempotency key', async () => {
   expect(options.headers['Idempotency-Key']).toBe('portal-invite/hash');
   const body = JSON.parse(options.body);
   expect(body.to).toEqual(['member@example.com']);
-  expect(body.text).toContain('https://www.smartbrew.tech/portal/login');
+  expect(body.text).toContain('https://www.smartbrew.tech/portal/activate#token=code');
   expect(body.text).toContain('code');
   expect(body.text).not.toContain('private-key');
 });

@@ -9,6 +9,6 @@ export default function InviteForm() {
     <p className="text-sm">Si fue revocado, se podrá invitar nuevamente: deberá elegir una contraseña nueva y volver a conectar Instagram.</p>
     <button disabled={pending} className="rounded bg-cyan-700 text-white px-4 py-2">{pending ? 'Enviando…' : 'Enviar invitación por email'}</button>
     <p role="status">{state.message}</p>
-    {state.code && <div><p>Activar en /portal/login, pestaña «Aceptar invitación»:</p><code className="break-all select-all">{state.code}</code></div>}
+    {state.code && <div><p>Compartí este enlace únicamente con el invitado:</p><a className="underline break-all" href={`/portal/activate#token=${state.code}`}>Abrir enlace privado de activación</a></div>}
   </form>;
 }

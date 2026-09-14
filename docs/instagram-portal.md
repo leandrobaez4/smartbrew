@@ -4,6 +4,14 @@
 
 Accesos por invitación creados en `/admin/instagram`; activación y login en
 `/portal/login`; autorización y perfil en `/portal/instagram`.
+Los emails nuevos llevan a `/portal/activate#token=...`: no se pide correo ni copiar
+código, solo una contraseña nueva. El token se identifica por su hash y se valida
+en el servidor tanto al abrir como al confirmar. Solo confirmar consume la invitación
+de forma atómica mediante el flujo de activación existente. El fragmento evita incluir
+el token en logs HTTP; se envía al servidor únicamente en el cuerpo de las acciones.
+No activar seguimiento de clics en Resend para estos enlaces sensibles. La página
+requiere JavaScript. Los emails anteriores con código siguen funcionando desde
+“Aceptar invitación” en el login. Para probar el flujo nuevo hay que reenviar el email.
 No hay registro público. Las invitaciones se envían mediante Resend.
 El código de activación vence en 7 días y se consume
 una sola vez para elegir una contraseña. La sesión dura 24 horas. El login admite
