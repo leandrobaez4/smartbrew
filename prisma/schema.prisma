@@ -15,6 +15,42 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
+// Invited portal members are deliberately NOT admin Users.
+model PortalMember {
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String?
+  inviteHash   String? @unique
+  inviteExpiresAt DateTime?
+  disabled     Boolean @default(false)
+  loginAttempts Int @default(0)
+  loginWindowEnd DateTime?
+  createdAt    DateTime @default(now())
+  sessions     PortalSession[]
+  connection   InstagramConnection?
+}
+
+model PortalSession {
+  tokenHash String @id
+  memberId String
+  member PortalMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  oauthStateHash String? @unique
+  oauthExpiresAt DateTime?
+  @@index([memberId])
+}
+
+model InstagramConnection {
+  id String @id @default(cuid())
+  memberId String @unique
+  member PortalMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  instagramId String @unique
+  username String
+  encryptedToken String
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+}
+
 model Product {
   id                   String   @id @default(cuid())
   marketplace          String   @default("MERCADO_LIBRE")

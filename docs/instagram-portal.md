@@ -1,0 +1,68 @@
+# Portal de Instagram: primera etapa de Basic
+
+## Alcance
+
+Accesos por invitación creados en `/admin/instagram`; activación y login en
+`/portal/login`; autorización y perfil en `/portal/instagram`.
+No hay registro público ni envío automático de invitaciones por email.
+Compartir el código de activación por un canal privado: vence en 7 días y se consume
+una sola vez para elegir una contraseña. La sesión dura 24 horas. El login admite
+5 intentos por cuenta cada 15 minutos. El administrador puede revocar el acceso.
+
+Los invitados NO son filas de User ni usan la cookie del admin. Cada consulta de
+perfil usa el miembro de la sesión del servidor, nunca un ID proporcionado por el
+navegador. Los tokens se cifran con AES-256-GCM y se vinculan al propietario.
+El portal no suscribe webhooks, publica ni envía DMs. No reemplaza las variables
+del bot existente. Se rechaza conectar el INSTAGRAM_ACCOUNT_ID reservado del bot.
+
+## Configuración pendiente antes de producción
+
+1. Revisar y aplicar la ampliación aditiva de `prisma/schema.prisma` a la base
+   correcta con backup previo. El proyecto usa `prisma db push`: no ejecutar
+   reset ni aceptar pérdida de datos. Se agregan PortalMember, PortalSession e
+   InstagramConnection; no se modifican tablas existentes.
+2. Ejecutar `npx prisma generate` en el build de despliegue.
+3. Configurar en Production, sin modificar el token/base/ID del bot:
+   - `INSTAGRAM_OAUTH_CLIENT_ID`: ID de la app de Instagram del flujo Instagram Login.
+   - `INSTAGRAM_OAUTH_CLIENT_SECRET`: secreto de esa app de Instagram.
+   - `INSTAGRAM_PORTAL_ORIGIN=https://www.smartbrew.tech`.
+   - `INSTAGRAM_OAUTH_API_VERSION`: versión compatible seleccionada para la app
+     (por defecto v21.0, igual que la integración existente; verificar soporte en Meta).
+   - `INSTAGRAM_TOKEN_ENCRYPTION_KEY`: 32 bytes aleatorios codificados en 64 caracteres
+     hexadecimales. Generar en un gestor de secretos. No pegar en chats ni git.
+   - `SESSION_SECRET`: secreto robusto de al menos 32 caracteres para el admin.
+4. Registrar EXACTAMENTE en las URLs de redirección OAuth de Instagram Login:
+   `https://www.smartbrew.tech/api/instagram/callback`.
+   Iniciar sesión en el mismo dominio, no en un alias vercel.app.
+5. Desplegar y probar con una cuenta profesional distinta de la cuenta reservada.
+
+## Prueba manual obligatoria (no validada contra Meta todavía)
+
+- Crear invitación desde admin, activar con código y contraseña, cerrar sesión y volver a entrar.
+- Código expirado/reutilizado: rechazar. Cuenta revocada: pierde acceso.
+- Invitado sin cookie admin: `/admin/products`, `/admin/logs` y acciones de
+  invitación deben rechazar acceso; probar también POST directo a las acciones.
+- Conectar Instagram: aceptar Basic, regresar y ver username/user_id de la API.
+- Rechazar permisos, state inválido/vencido y recargar callback: no guardar conexión.
+- Dos miembros no pueden leer/actualizar/desconectar la conexión del otro.
+- Actualizar perfil vuelve a consultar Meta. Token vencido pide reconectar.
+- Desconectar borra el token local; no revoca permisos en Meta para no afectar el bot.
+  El usuario puede retirar la autorización en Apps y sitios web de Instagram.
+- Confirmar que un comentario real de SmartBrew sigue enviando el enlace del producto.
+
+## Grabación y revisión
+
+Grabar login del portal, Conectar Instagram, autorización oficial, vuelta al portal
+y perfil real consultado. No mostrar contraseñas, códigos de invitación, secretos,
+tokens ni el query del callback. Crear credenciales de SmartBrew exclusivas para
+el revisor; nunca proporcionar credenciales de Instagram. El formulario de Basic
+debe describir esta primera etapa real. Este portal solo solicita Basic, no sirve
+por sí solo como demostración de automatizaciones multicuenta ni garantiza aprobación.
+
+## Limitaciones explícitas
+
+No hay recuperación autónoma de contraseña, facturación, renovación automática de
+tokens ni automatización multicuenta. El token de larga duración muestra su vencimiento
+y el usuario puede reconectar. Antes de ofrecer pilotos públicos: probar aislamiento
+contra una base de test, completar pruebas OAuth reales, callbacks de revocación/
+eliminación de datos según la configuración de Meta y revisar retención de datos.
