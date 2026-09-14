@@ -16,9 +16,18 @@ export async function inviteMember(_state: { message: string; code?: string }, f
     const existing = await portalDb.portalMember.findUnique({ where: { email: email.data }, select: { id: true, disabled: true, passwordHash: true, inviteHash: true } });
     const data = { inviteHash, inviteExpiresAt: new Date(Date.now() + 7 * 86400000) };
     if (existing) {
-      if (existing.disabled || existing.passwordHash) return { message: 'Este usuario ya activó su acceso o fue revocado. No se envió otra invitación.' };
-      const updated = await portalDb.portalMember.updateMany({ where: { id: existing.id, disabled: false, passwordHash: null, inviteHash: existing.inviteHash }, data });
-      if (!updated.count) return { message: 'La invitación cambió. Actualizá la página antes de intentar nuevamente.' };
+      if (existing.disabled) {
+        await portalDb.$transaction(async tx => {
+          const updated = await tx.portalMember.updateMany({ where: { id: existing.id, disabled: true }, data: { ...data, disabled: false, passwordHash: null, loginAttempts: 0, loginWindowEnd: null } });
+          if (!updated.count) throw new Error('Member changed');
+          await tx.portalSession.deleteMany({ where: { memberId: existing.id } });
+          await tx.instagramConnection.deleteMany({ where: { memberId: existing.id } });
+        });
+      } else {
+        if (existing.passwordHash) return { message: 'Este usuario ya activó su acceso. No se envió otra invitación.' };
+        const updated = await portalDb.portalMember.updateMany({ where: { id: existing.id, disabled: false, passwordHash: null, inviteHash: existing.inviteHash }, data });
+        if (!updated.count) return { message: 'La invitación cambió. Actualizá la página antes de intentar nuevamente.' };
+      }
     } else await portalDb.portalMember.create({ data: { email: email.data, ...data } });
   } catch { return { message: 'No se pudo guardar la invitación. Actualizá la página y volvé a intentar.' }; }
   revalidatePath('/admin/instagram');

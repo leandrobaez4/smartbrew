@@ -16,8 +16,10 @@ Configurar `RESEND_API_KEY` y `PORTAL_EMAIL_FROM` (por ejemplo,
 El dominio del remitente debe estar verificado en Resend mediante sus registros DNS.
 Referencia: https://resend.com/docs/knowledge-base/how-do-I-create-an-email-address-or-sender-in-resend
 No se crean invitaciones si falta esta configuración. Volver a enviar al mismo correo
-pendiente genera un código nuevo e invalida el anterior. No reinvita usuarios activos
-ni revocados. No hay envío masivo ni reintentos automáticos.
+pendiente genera un código nuevo e invalida el anterior. No reinvita usuarios activos.
+Reinvitar un usuario revocado lo deja pendiente de activación con contraseña nueva,
+elimina sus sesiones y conexión anteriores y reinicia el límite de intentos, en una
+transacción. Debe volver a conectar Instagram. No hay envío masivo ni reintentos automáticos.
 Si falla o vence la solicitud a Resend, se conserva la invitación y se ofrece el
 código al administrador como alternativa privada. Una respuesta exitosa significa
 aceptación por Resend, no entrega en la bandeja: revisar entrega/rebotes en su dashboard.
