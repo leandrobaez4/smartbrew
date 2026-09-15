@@ -27,7 +27,7 @@ export default async function InstagramPage({ searchParams }: { searchParams: Pr
     {connection && <section className="border border-slate-700 rounded-xl p-5 space-y-3"><h2 className="text-xl font-semibold">@{connection.username}</h2><dl><dt>ID de Instagram</dt><dd className="break-all">{connection.instagramId}</dd><dt>Perfil consultado</dt><dd>{connection.updatedAt.toISOString()}</dd><dt>Autorización válida hasta</dt><dd>{connection.expiresAt.toISOString()}</dd></dl>
       {connection.expiresAt <= new Date() && <p>Autorización vencida: reconectá tu cuenta.</p>}
       <form action={refreshProfile}><button className={button}>Actualizar perfil desde Instagram</button></form>
-      <form action={disconnectInstagram}><button className="text-red-300 underline">Desconectar y eliminar token guardado</button></form>
+      <form action={disconnectInstagram}><button type="submit" className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-red-700 bg-red-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:border-red-800 hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400">Desconectar y eliminar token guardado</button></form>
     </section>}
     <form action={connectInstagram}><button disabled={!configured} className={button}>{connection ? 'Volver a autorizar Instagram' : 'Conectar Instagram'}</button></form>
     <p className="text-sm text-slate-400">La contraseña se ingresa solo en Instagram. SmartBrew guarda el token cifrado, nunca lo muestra y no modifica la cuenta del bot de producción.</p>
