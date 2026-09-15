@@ -1,5 +1,6 @@
 'use server';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { portalDb, requirePortal, endPortalSession } from '@/lib/portal';
 import { hashSecret, randomSecret, openToken } from '@/lib/portal-crypto';
 import { authorizationUrl, instagramProfile } from '@/lib/instagram-login';
@@ -25,13 +26,30 @@ export async function refreshProfile() {
   redirect('/portal/instagram?status=refreshed');
 }
 
-export async function disconnectInstagram() {
+export async function disconnectInstagram(_state: { error: string }, form: FormData) {
   const session = await requirePortal();
+  if (form.get('confirm') !== 'yes') return { error: 'Confirmá que querés eliminar la conexión guardada.' };
+  const connectionId = String(form.get('connectionId') || '');
+  const version = new Date(String(form.get('version') || ''));
+  if (!connectionId || connectionId.length > 128 || !Number.isFinite(version.getTime())) return { error: 'Actualizá la página antes de desconectar.' };
   // Local disconnection only; does not revoke Meta permissions shared with the live bot.
-  await portalDb.$transaction([
-    portalDb.portalSession.updateMany({ where: { memberId: session.memberId }, data: { oauthStateHash: null, oauthExpiresAt: null } }),
-    portalDb.instagramConnection.deleteMany({ where: { memberId: session.memberId } }),
-  ]);
+  try {
+    const result = await portalDb.$transaction(async tx => {
+      // Same lock order as OAuth completion: member, sessions, connection.
+      const active = await tx.portalMember.updateMany({ where: { id: session.memberId, disabled: false }, data: { disabled: false } });
+      if (!active.count) throw new Error('Inactive member');
+      const current = await tx.instagramConnection.findUnique({ where: { memberId: session.memberId }, select: { id: true, updatedAt: true } });
+      if (!current) return 'absent';
+      if (current.id !== connectionId || current.updatedAt.getTime() !== version.getTime()) return 'changed';
+      await tx.portalSession.updateMany({ where: { memberId: session.memberId }, data: { oauthStateHash: null, oauthExpiresAt: null } });
+      const removed = await tx.instagramConnection.deleteMany({ where: { memberId: session.memberId, id: connectionId, updatedAt: version } });
+      if (!removed.count) throw new Error('Connection changed');
+      return 'removed';
+    });
+    if (result === 'changed') return { error: 'La conexión cambió desde que abriste esta página. Recargá y confirmá la cuenta nuevamente.' };
+  } catch { return { error: 'No pudimos completar la desconexión. No se confirmó ningún cambio; intentá nuevamente.' }; }
+  revalidatePath('/admin/instagram');
+  revalidatePath('/portal/instagram');
   redirect('/portal/instagram?status=disconnected');
 }
 

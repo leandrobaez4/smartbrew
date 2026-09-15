@@ -91,6 +91,23 @@ por sí solo como demostración de automatizaciones multicuenta ni garantiza apr
 
 ## Limitaciones explícitas
 
+### Desconexión desde el portal
+
+El botón abre una confirmación que identifica la cuenta y explica el alcance local.
+La acción exige sesión y confirmación, cancela autorizaciones OAuth pendientes y
+elimina únicamente la conexión de ese miembro. Un formulario antiguo no elimina
+una conexión reemplazada o actualizada: requiere recargar y confirmar nuevamente.
+Los errores no se presentan como éxito. Se conservan usuario y sesión del portal.
+No se implementó facturación ni cancelación de suscripciones.
+
+La revocación remota de permisos sigue pendiente: la documentación oficial consultada
+de Instagram Business Login no confirma un endpoint de revocación para este flujo.
+No confundir un endpoint de Facebook Login con Instagram Login ni probar llamadas
+DELETE especulativas sobre producción. Referencia consultada:
+https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login/business-login
+Prueba manual pendiente después del despliegue: abrir/cancelar sin modificar nada,
+confirmar con cuenta de prueba, verificar desaparición en listado y reconectar.
+
 No hay recuperación autónoma de contraseña, facturación, renovación automática de
 tokens ni automatización multicuenta. El token de larga duración muestra su vencimiento
 y el usuario puede reconectar. Antes de ofrecer pilotos públicos: probar aislamiento

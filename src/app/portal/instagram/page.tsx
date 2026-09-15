@@ -1,11 +1,12 @@
 import { portalDb, requirePortal } from '@/lib/portal';
 import { instagramLoginConfig } from '@/lib/instagram-login';
-import { connectInstagram, disconnectInstagram, logoutPortal, refreshProfile } from './actions';
+import { connectInstagram, logoutPortal, refreshProfile } from './actions';
+import DisconnectForm from './disconnect-form';
 export const dynamic = 'force-dynamic';
 const messages: Record<string, string> = {
   connected: 'Cuenta conectada. Perfil obtenido de la API de Instagram.',
   refreshed: 'Información actualizada desde Instagram.',
-  disconnected: 'Conexión local y token eliminados. Podés retirar la autorización también desde Instagram → Apps y sitios web.',
+  disconnected: 'Conexión local y token eliminados. Para retirar también la autorización en Instagram, seguí los pasos indicados más abajo.',
   configuration: 'El administrador debe completar la configuración de Instagram Login.',
   denied: 'No autorizaste la conexión. Podés intentarlo de nuevo.',
   failed: 'No se pudo conectar. Revisá los permisos, la configuración de Meta o si la cuenta ya está vinculada a otro acceso.',
@@ -15,7 +16,7 @@ const messages: Record<string, string> = {
 };
 export default async function InstagramPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const session = await requirePortal();
-  const connection = await portalDb.instagramConnection.findUnique({ where: { memberId: session.memberId }, select: { username: true, instagramId: true, expiresAt: true, updatedAt: true } });
+  const connection = await portalDb.instagramConnection.findUnique({ where: { memberId: session.memberId }, select: { id: true, username: true, instagramId: true, expiresAt: true, updatedAt: true } });
   const { status } = await searchParams;
   let configured = true;
   try { instagramLoginConfig(); } catch { configured = false; }
@@ -27,9 +28,21 @@ export default async function InstagramPage({ searchParams }: { searchParams: Pr
     {connection && <section className="border border-slate-700 rounded-xl p-5 space-y-3"><h2 className="text-xl font-semibold">@{connection.username}</h2><dl><dt>ID de Instagram</dt><dd className="break-all">{connection.instagramId}</dd><dt>Perfil consultado</dt><dd>{connection.updatedAt.toISOString()}</dd><dt>Autorización válida hasta</dt><dd>{connection.expiresAt.toISOString()}</dd></dl>
       {connection.expiresAt <= new Date() && <p>Autorización vencida: reconectá tu cuenta.</p>}
       <form action={refreshProfile}><button className={button}>Actualizar perfil desde Instagram</button></form>
-      <form action={disconnectInstagram}><button type="submit" className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-red-700 bg-red-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:border-red-800 hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400">Desconectar y eliminar token guardado</button></form>
+      <DisconnectForm key={`${connection.id}:${connection.updatedAt.toISOString()}`} connectionId={connection.id} username={connection.username} version={connection.updatedAt.toISOString()} />
     </section>}
     <form action={connectInstagram}><button disabled={!configured} className={button}>{connection ? 'Volver a autorizar Instagram' : 'Conectar Instagram'}</button></form>
     <p className="text-sm text-slate-400">La contraseña se ingresa solo en Instagram. SmartBrew guarda el token cifrado, nunca lo muestra y no modifica la cuenta del bot de producción.</p>
+    <section aria-labelledby="instagram-remove-access" className="rounded-xl border border-slate-700 p-5 space-y-3 text-sm">
+      <h2 id="instagram-remove-access" className="text-lg font-semibold">Cómo quitar también la autorización desde Instagram</h2>
+      <p>Desconectar en SmartBrew elimina la conexión y el token guardado en este portal. Para retirar además el permiso que Instagram conserva para Afiliados-IG:</p>
+      <ol className="list-decimal pl-5 space-y-2">
+        <li>Abrí Instagram y seleccioná el perfil de la cuenta que querés desconectar.</li>
+        <li>Desde tu perfil, abrí el menú ☰ y buscá Configuración y actividad. En una computadora, entrá en Más → Configuración.</li>
+        <li>Entrá en Permisos del sitio web → Apps y sitios web.</li>
+        <li>En Activas, buscá Afiliados-IG, seleccioná Eliminar y confirmá.</li>
+      </ol>
+      <p className="text-slate-400">Los nombres de los menús pueden variar según la versión de Instagram. Esto no elimina tu cuenta de Instagram ni tu usuario de SmartBrew. Para volver a usar la conexión, tendrás que autorizarla nuevamente.</p>
+      <a href="https://help.instagram.com/1144624522593085" target="_blank" rel="noopener noreferrer" className="inline-block underline text-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400">Ver ayuda de Instagram (abre en otra pestaña)</a>
+    </section>
     <form action={logoutPortal}><button className="underline">Cerrar sesión</button></form></>;
 }
