@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+@layer base {
+  button,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  [role="button"],
+  .button {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input[type="button"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="reset"]:disabled,
+  [role="button"][aria-disabled="true"],
+  .button[aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 :root {
   --ink: #070b0c;
   --ink-soft: #0d1314;
