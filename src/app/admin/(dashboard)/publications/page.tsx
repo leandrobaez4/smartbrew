@@ -35,7 +35,7 @@ export default async function PublicationsPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400`}>
-                    {pub.status}
+                    {pub.deletedAt ? 'ELIMINADA (historial conservado)' : pub.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-red-500 max-w-xs truncate">

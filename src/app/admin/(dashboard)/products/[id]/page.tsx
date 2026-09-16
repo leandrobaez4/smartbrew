@@ -27,7 +27,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   }
 
   const isPublished = product.drafts.some(d => 
-    d.publications.some(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED')
+    d.publications.some(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED' && !pub.deletedAt)
   );
 
   async function updateAffiliateUrl(formData: FormData) {

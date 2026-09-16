@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { runPublicationAction } from '@/lib/publication-client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -39,7 +40,7 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
 
   const handleStatusChange = async (newStatus: ProductStatus) => {
     setIsProcessing(true);
-    const res = await updateProductStatusAction(product.id, newStatus);
+    const res = await runPublicationAction(() => updateProductStatusAction(product.id, newStatus));
     if (res.success) {
       setCurrentStatus(newStatus);
       router.refresh();
@@ -57,10 +58,10 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
     if (!confirm(`¿Publicar "${product.title}" en Instagram?`)) return;
 
     setIsProcessing(true);
-    const res = await publishToInstagramAction([product.id]);
+    const res = await runPublicationAction(() => publishToInstagramAction([product.id]));
     if (res.success) {
       setIsPublished(true);
-      alert('✅ ¡Producto publicado con éxito en Instagram!');
+      alert(res.message || 'Publicación confirmada.');
       router.refresh();
     } else {
       alert(`Error al publicar: ${res.message}`);
@@ -70,17 +71,15 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
 
   const handleUnpublish = async () => {
     const confirmMsg = confirm(
-      `¿Despublicar "${product.title}" de Instagram?\n\nSi el producto se quedó sin stock en Mercado Libre, también se marcará como PAUSADO para evitar enviar a compradores a un link roto.`
+      `¿Eliminar la publicación de "${product.title}" en Instagram? No es un archivado temporal. Se conservará el historial y solo se marcará eliminada cuando Meta lo confirme.`
     );
     if (!confirmMsg) return;
 
     setIsProcessing(true);
-    const res = await unpublishFromInstagramAction([product.id]);
+    const res = await runPublicationAction(() => unpublishFromInstagramAction([product.id]));
     if (res.success) {
-      await updateProductStatusAction(product.id, 'PAUSED');
       setIsPublished(false);
-      setCurrentStatus('PAUSED');
-      alert('🗑️ ¡Producto despublicado de Instagram y marcado como PAUSADO correctamente!');
+      alert(res.message || 'Eliminación confirmada.');
       router.refresh();
     } else {
       alert(`Error al despublicar: ${res.message}`);
@@ -232,7 +231,7 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
                   className="inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-xl text-xs transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
                 >
                   {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                  Despublicar y Pausar
+                  Eliminar en Instagram
                 </button>
               ) : (
                 <button

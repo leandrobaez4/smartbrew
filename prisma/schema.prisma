@@ -157,6 +157,7 @@ model Publication {
   externalContainerId String?
   externalMediaId     String?
   externalPermalink   String?
+  deletedAt           DateTime?
   status              PublicationStatus @default(QUEUED)
   attemptCount        Int      @default(0)
   lastErrorCode       String?

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { runPublicationAction } from '@/lib/publication-client';
 import { useRouter } from 'next/navigation';
 import { Camera, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction } from '../actions';
@@ -13,25 +14,25 @@ export default function InstagramPublishButton({ productId, isPublished }: { pro
     if (!confirm('¿Seguro que querés publicar este producto en Instagram?')) return;
     
     setIsProcessing(true);
-    const result = await publishToInstagramAction([productId]);
-    if (result && !result.success) {
+    const result = await runPublicationAction(() => publishToInstagramAction([productId]));
+    if (!result.success) {
       alert(`Error al publicar: ${result.message}`);
     } else {
-      alert('✅ ¡Producto publicado con éxito en Instagram!');
+      alert(result.message || 'Publicación confirmada.');
     }
     setIsProcessing(false);
     router.refresh();
   };
 
   const handleUnpublish = async () => {
-    if (!confirm('¿Seguro que querés despublicar este producto de Instagram? (Solo lo remueve de nuestro sistema)')) return;
+    if (!confirm('¿Eliminar la publicación de Instagram? No es un archivado temporal. SmartBrew conservará el historial y solo marcará la eliminación cuando Meta la confirme.')) return;
     
     setIsProcessing(true);
-    const result = await unpublishFromInstagramAction([productId]);
+    const result = await runPublicationAction(() => unpublishFromInstagramAction([productId]));
     if (result && !result.success) {
       alert(`Error al despublicar: ${result.message}`);
     } else {
-      alert('🗑️ Producto desvinculado de Instagram correctamente.');
+      alert('🗑️ Eliminación confirmada.');
     }
     setIsProcessing(false);
     router.refresh();
@@ -39,7 +40,7 @@ export default function InstagramPublishButton({ productId, isPublished }: { pro
 
   const handleVerify = async () => {
     setIsProcessing(true);
-    const result = await verifyInstagramPublicationAction(productId);
+    const result = await runPublicationAction(() => verifyInstagramPublicationAction(productId));
     if (result && !result.success) {
       alert(`Error al verificar: ${result.message}`);
     } else if (result) {
@@ -70,7 +71,7 @@ export default function InstagramPublishButton({ productId, isPublished }: { pro
               disabled={isProcessing}
               className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
             >
-              <Trash2 size={16} /> Desvincular
+              <Trash2 size={16} /> Eliminar en Instagram
             </button>
           </div>
         ) : (

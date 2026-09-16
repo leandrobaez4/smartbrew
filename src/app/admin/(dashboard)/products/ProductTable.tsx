@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { runPublicationAction } from '@/lib/publication-client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ProductStatus } from '@prisma/client';
@@ -64,11 +65,11 @@ export default function ProductTable({ products, total, page, totalPages, search
     if (!confirm(`¿Publicar ${selectedIds.size} productos seleccionados en Instagram?`)) return;
     
     setIsProcessing(true);
-    const result = await publishToInstagramAction(Array.from(selectedIds));
-    if (result && !result.success) {
+    const result = await runPublicationAction(() => publishToInstagramAction(Array.from(selectedIds)));
+    if (!result.success) {
       alert(`Error al publicar: ${result.message}`);
     } else {
-      alert(`✅ ¡${selectedIds.size} producto(s) publicado(s) con éxito en Instagram!`);
+      alert(result.message || 'Publicación confirmada.');
       setSelectedIds(new Set());
     }
     setIsProcessing(false);
@@ -77,11 +78,12 @@ export default function ProductTable({ products, total, page, totalPages, search
 
   const handleUnpublish = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`¿Despublicar ${selectedIds.size} productos seleccionados de Instagram?`)) return;
+    if (!confirm(`¿Eliminar las publicaciones de ${selectedIds.size} productos en Instagram? No es un archivado temporal. Se conservará el historial; solo se marcarán eliminadas cuando Meta lo confirme.`)) return;
     
     setIsProcessing(true);
-    await unpublishFromInstagramAction(Array.from(selectedIds));
-    setSelectedIds(new Set());
+    const result = await runPublicationAction(() => unpublishFromInstagramAction(Array.from(selectedIds)));
+    if (!result.success) alert(result.message);
+    else setSelectedIds(new Set());
     setIsProcessing(false);
     router.refresh();
   };
@@ -223,7 +225,7 @@ export default function ProductTable({ products, total, page, totalPages, search
               disabled={isProcessing}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
-              <Trash2 size={16} /> Despublicar
+              <Trash2 size={16} /> Eliminar de Instagram
             </button>
             <button
               onClick={handlePublish}

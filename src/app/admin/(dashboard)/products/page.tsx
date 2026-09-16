@@ -43,7 +43,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const products = productsRaw.map(p => {
     // Revisar si tiene alguna publicacion con status PUBLISHED en algun draft
     const isPublished = p.drafts.some(d => 
-      d.publications.some(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED')
+      d.publications.some(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED' && !pub.deletedAt)
     );
 
     return {
