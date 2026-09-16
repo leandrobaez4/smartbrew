@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import CheckAvailabilityButton from './CheckAvailabilityButton';
 import InstagramPublishButton from './InstagramPublishButton';
 import BackButton from './BackButton';
+import InstagramReconciliation from './InstagramReconciliation';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <CheckAvailabilityButton productId={product.id} externalId={product.externalId || ''} />
           
           <InstagramPublishButton productId={product.id} isPublished={isPublished} />
+          {product.drafts.flatMap(d => d.publications).filter(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED' && !pub.deletedAt).map(pub => (
+            <InstagramReconciliation key={pub.id} productId={product.id} publicationId={pub.id} mediaId={pub.externalMediaId} />
+          ))}
         </div>
       </div>
 

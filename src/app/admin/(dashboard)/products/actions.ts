@@ -168,6 +168,37 @@ export async function verifyInstagramPublicationAction(productId: string) {
     return { success: true, status: 'EXISTS', message: 'Instagram confirmó que las publicaciones consultadas siguen accesibles.' };
   } catch (error) { return { success: false, status: 'UNCONFIRMED', message: `${errorMessage(error)} No se modificaron datos ni se confirmó una eliminación.` }; }
 }
+export async function reconcileInstagramPublicationAction(productId: string, publicationId: string, reason: string, confirmed: boolean) {
+  try {
+    const session = await getSession();
+    if (!session) throw new PublicationError('Iniciá sesión como administrador.');
+    if (typeof productId !== 'string' || !productId || productId.length > 128 || typeof publicationId !== 'string' || !publicationId || publicationId.length > 128 || confirmed !== true || typeof reason !== 'string' || reason.trim().length < 10 || reason.length > 1000) {
+      throw new PublicationError('Confirmá la conciliación y explicá el motivo (entre 10 y 1000 caracteres).');
+    }
+    await prisma.$transaction(async tx => {
+      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`;
+      if (!rows.length) throw new PublicationError('Producto no encontrado.');
+      const publications = await tx.publication.findMany({ where: { draft: { productId }, platform: 'INSTAGRAM', deletedAt: null } });
+      if (publications.some(p => ['QUEUED', 'UPLOADING', 'PROCESSING'].includes(p.status) || p.lastErrorCode === 'DELETE_IN_PROGRESS')) {
+        throw new PublicationError('Hay una operación en curso. No se puede retirar el registro mientras publica o elimina.');
+      }
+      const publication = publications.find(p => p.id === publicationId && p.status === 'PUBLISHED');
+      if (!publication) throw new PublicationError('El registro cambió o ya fue retirado. Actualizá la página.');
+      const retiredAt = new Date();
+      // Audit and retirement commit together; retain the original IDs, status and relationships.
+      await tx.systemLog.create({ data: {
+        level: 'WARN', source: 'instagram_reconciliation', message: 'Retiro administrativo; NO confirma eliminación en Meta.',
+        details: { productId, publicationId, externalMediaId: publication.externalMediaId, externalContainerId: publication.externalContainerId,
+          previousErrorCode: publication.lastErrorCode, previousErrorMessage: publication.lastErrorMessage,
+          actor: String(session.userId || session.user?.id || session.email || session.user?.email || session.sub || 'admin'),
+          reason: reason.trim(), retiredAt: retiredAt.toISOString(), remoteDeletionConfirmed: false },
+      } });
+      await tx.publication.update({ where: { id: publicationId }, data: { deletedAt: retiredAt, lastErrorCode: 'ADMIN_RETIRED', lastErrorMessage: `Retiro administrativo (sin confirmación de Meta): ${reason.trim()}` } });
+    });
+    refresh(productId); revalidatePath('/admin/logs');
+    return { success: true, message: 'Registro retirado administrativamente. Historial conservado; no se eliminó ni publicó nada en Instagram. Podés volver a publicar si no quedan otros registros activos.' };
+  } catch (error) { return { success: false, message: errorMessage(error) }; }
+}
 export async function updateProductStatusAction(productId: string, status: 'CANDIDATE' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED') {
   try {
     await requireAdmin();

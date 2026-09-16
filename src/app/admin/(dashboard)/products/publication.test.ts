@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ auth: vi.fn(), transaction: vi.fn(), lock: vi.fn(), product: vi.fn(), active: vi.fn(), draft: vi.fn(), create: vi.fn(), update: vi.fn(), list: vi.fn(), meta: vi.fn() }));
+const m = vi.hoisted(() => ({ auth: vi.fn(), transaction: vi.fn(), lock: vi.fn(), product: vi.fn(), active: vi.fn(), draft: vi.fn(), create: vi.fn(), update: vi.fn(), list: vi.fn(), meta: vi.fn(), audit: vi.fn() }));
 vi.mock('@prisma/client', () => ({ PrismaClient: class {
   $transaction = m.transaction;
   publication = { update: m.update, findMany: m.list };
@@ -9,7 +9,7 @@ vi.mock('@/lib/logger', () => ({ logSystemEvent: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/meta-api', async () => ({ ...await import('../../../../lib/meta-api'), requestMeta: m.meta }));
 import { MetaApiError } from '@/lib/meta-api';
-import { publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction } from './actions';
+import { publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction, reconcileInstagramPublicationAction } from './actions';
 import { runPublicationAction } from '../../../../lib/publication-client';
 
 beforeEach(() => {
@@ -24,7 +24,7 @@ beforeEach(() => {
   m.product.mockResolvedValue({ id: 'product', affiliateUrl: 'https://example.org/product', primaryImageUrl: 'https://example.org/image.jpg' });
   m.active.mockResolvedValue(null); m.draft.mockResolvedValue({ id: 'draft', caption: 'Product' });
   m.create.mockResolvedValue({ id: 'publication' }); m.update.mockResolvedValue({});
-  m.transaction.mockImplementation(fn => fn({ $queryRaw: m.lock, product: { findUniqueOrThrow: m.product }, publication: { findFirst: m.active, create: m.create, findMany: m.list, update: m.update }, contentDraft: { findFirst: m.draft } }));
+  m.transaction.mockImplementation(fn => fn({ $queryRaw: m.lock, product: { findUniqueOrThrow: m.product }, publication: { findFirst: m.active, create: m.create, findMany: m.list, update: m.update }, contentDraft: { findFirst: m.draft }, systemLog: { create: m.audit } }));
   m.meta.mockResolvedValueOnce({ id: '111' }).mockResolvedValueOnce({ id: '222' });
   m.list.mockResolvedValue([{ id: 'publication', externalMediaId: '222' }]);
 });
@@ -34,7 +34,51 @@ it('requires an admin session before every operation', async () => {
   expect((await publishToInstagramAction(['product'])).success).toBe(false);
   expect((await verifyInstagramPublicationAction('product')).success).toBe(false);
   expect((await unpublishFromInstagramAction(['product'])).success).toBe(false);
+  expect((await reconcileInstagramPublicationAction('product', 'publication', 'Verificado manualmente', true)).success).toBe(false);
   expect(m.transaction).not.toHaveBeenCalled(); expect(m.meta).not.toHaveBeenCalled();
+});
+it('retires only the selected record and audits without contacting Meta or removing IDs', async () => {
+  setupDeletion();
+  expect((await reconcileInstagramPublicationAction('product', 'publication', 'Cuenta revisada; post no localizado', true)).success).toBe(true);
+  expect(m.list).toHaveBeenCalledWith({ where: { draft: { productId: 'product' }, platform: 'INSTAGRAM', deletedAt: null } });
+  expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ details: expect.objectContaining({ actor: 'admin', externalMediaId: '222', remoteDeletionConfirmed: false }) }) }));
+  expect(m.update).toHaveBeenCalledWith({ where: { id: 'publication' }, data: { deletedAt: expect.any(Date), lastErrorCode: 'ADMIN_RETIRED', lastErrorMessage: expect.stringContaining('sin confirmación de Meta') } });
+  expect(m.meta).not.toHaveBeenCalled();
+});
+it.each([[false, 'Motivo suficientemente largo'], [true, ''], [true, 'corto'], [true, 'x'.repeat(1001)]])('requires explicit confirmation and a valid reason', async (confirmation, reason) => {
+  expect((await reconcileInstagramPublicationAction('product', 'publication', reason as string, confirmation as boolean)).success).toBe(false);
+  expect(m.transaction).not.toHaveBeenCalled();
+});
+it.each(['QUEUED', 'UPLOADING', 'PROCESSING', 'DELETE_IN_PROGRESS'])('rejects reconciliation during %s', async state => {
+  m.list.mockResolvedValue([{ id: 'publication', status: state === 'DELETE_IN_PROGRESS' ? 'PUBLISHED' : state, lastErrorCode: state }]);
+  expect((await reconcileInstagramPublicationAction('product', 'publication', 'Revisión administrativa', true)).success).toBe(false);
+  expect(m.update).not.toHaveBeenCalled(); expect(m.audit).not.toHaveBeenCalled();
+});
+it('rejects stale or cross-product publication IDs', async () => {
+  setupDeletion();
+  expect((await reconcileInstagramPublicationAction('product', 'different', 'Revisión administrativa', true)).success).toBe(false);
+  expect(m.update).not.toHaveBeenCalled();
+});
+it('does not retire the record if audit persistence fails', async () => {
+  setupDeletion(); m.audit.mockRejectedValue(Error('Audit database unavailable'));
+  expect((await reconcileInstagramPublicationAction('product', 'publication', 'Revisión administrativa', true)).success).toBe(false);
+  expect(m.update).not.toHaveBeenCalled();
+});
+it('does not report reconciliation success when the transaction fails', async () => {
+  m.transaction.mockRejectedValue(Error('Rollback'));
+  expect((await reconcileInstagramPublicationAction('product', 'publication', 'Revisión administrativa', true)).success).toBe(false);
+});
+it('serializes duplicate administrative retirements', async () => {
+  setupDeletion();
+  let retired = false;
+  let tail = Promise.resolve();
+  const transaction = m.transaction.getMockImplementation()!;
+  m.list.mockImplementation(async () => retired ? [] : [{ id: 'publication', status: 'PUBLISHED', externalMediaId: '222' }]);
+  m.update.mockImplementation(async () => { retired = true; return {}; });
+  m.transaction.mockImplementation(fn => { const next = tail.then(() => transaction(fn)); tail = next.catch(() => undefined); return next; });
+  const results = await Promise.all([1, 2].map(() => reconcileInstagramPublicationAction('product', 'publication', 'Revisión administrativa', true)));
+  expect(results.filter(r => r.success)).toHaveLength(1);
+  expect(m.audit).toHaveBeenCalledTimes(1); expect(m.update).toHaveBeenCalledTimes(1);
 });
 it('reports already-published as an error without calling Meta', async () => {
   m.active.mockResolvedValue({ status: 'PUBLISHED' });

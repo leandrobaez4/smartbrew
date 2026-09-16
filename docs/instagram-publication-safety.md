@@ -20,6 +20,14 @@ Se verifica id y owner antes del DELETE. Bajo el mismo bloqueo Product usado par
 
 No hay conciliación automática de eliminaciones manuales. Un 404 no confirma una eliminación. El historial y la asociación media-producto usados por DM se conservan. No se ejecutaron eliminaciones reales ni se configuraron credenciales de producción durante la implementación.
 
-Limitación importante: esta versión evita falsos éxitos y pérdida de datos; no desbloquea automáticamente la lámpara eliminada manualmente. Resolver esa discrepancia exige confirmar el estado remoto o definir una confirmación administrativa explícita. Tampoco garantiza exactamente-una-vez frente a fallos externos: prioriza bloquear ante incertidumbre.
+## Conciliación administrativa
+
+En el detalle del producto, cada publicación activa tiene «Conciliar registro de Instagram». Exige motivo de 10–1000 caracteres, casilla de autorización y confirmación final con el ID del registro. Es una decisión humana explícita, nunca una deducción automática de un error de Meta o una lista vacía.
+
+La acción autenticada bloquea la fila Product y vuelve a comprobar el registro exacto y su pertenencia al producto. No permite conciliar durante QUEUED/UPLOADING/PROCESSING ni DELETE_IN_PROGRESS. En una misma transacción escribe SystemLog con administrador, motivo, IDs, fecha y errores anteriores, y asigna deletedAt con código ADMIN_RETIRED. No modifica el ID remoto, el borrador, las relaciones, el estado original ni el producto. El historial muestra «RETIRADA ADMINISTRATIVAMENTE (sin confirmación de Meta)», distinto de una eliminación remota confirmada. No requiere otra migración aparte del deletedAt ya existente.
+
+No llama a Meta ni publica de nuevo. El administrador debe revisar la cuenta y asumir el riesgo de duplicados antes de retirar el registro. Si ya no quedan otras publicaciones activas o en curso, una nueva publicación manual queda habilitada. Un proceso interrumpido en DELETE_IN_PROGRESS requiere investigación adicional; esta opción no libera ese bloqueo.
+
+Limitación importante: no garantiza exactamente-una-vez frente a fallos externos; prioriza bloquear ante incertidumbre. La conciliación no modifica por sí sola datos de producción hasta que un administrador la confirme desde la interfaz desplegada.
 
 Las pruebas de concurrencia simulan serialización; no sustituyen una prueba con dos conexiones PostgreSQL en un entorno de pruebas. No se probaron publicaciones ni eliminaciones reales durante este cambio.
