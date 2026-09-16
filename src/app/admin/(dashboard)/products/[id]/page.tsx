@@ -5,6 +5,7 @@ import CheckAvailabilityButton from './CheckAvailabilityButton';
 import InstagramPublishButton from './InstagramPublishButton';
 import BackButton from './BackButton';
 import InstagramReconciliation from './InstagramReconciliation';
+import FacebookInstagramVerification from './FacebookInstagramVerification';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
+      <FacebookInstagramVerification productId={product.id} publications={product.drafts.flatMap(d => d.publications).filter(p => p.platform === 'INSTAGRAM' && p.status === 'PUBLISHED' && !p.deletedAt).map(p => ({ id: p.id, mediaId: p.externalMediaId }))} />
       <form action={updateAffiliateUrl} className="border-t border-gray-200 dark:border-gray-800 pt-6">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Configuración de Afiliado</h2>
         

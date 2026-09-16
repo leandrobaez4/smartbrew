@@ -11,7 +11,7 @@ vi.mock('@/lib/meta-api', async () => ({ ...await import('../../../../lib/meta-a
 vi.mock('@/lib/instagram-container', async () => ({ ...await import('../../../../lib/instagram-container'), waitForInstagramContainer: m.wait }));
 import { InstagramContainerError } from '../../../../lib/instagram-container';
 import { MetaApiError } from '@/lib/meta-api';
-import { publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction, reconcileInstagramPublicationAction } from './actions';
+import { inspectFacebookInstagramAction, publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction, reconcileInstagramPublicationAction } from './actions';
 import { runPublicationAction } from '../../../../lib/publication-client';
 
 beforeEach(() => {
@@ -31,6 +31,59 @@ beforeEach(() => {
   m.list.mockResolvedValue([{ id: 'publication', externalMediaId: '222' }]);
 });
 afterEach(() => vi.unstubAllEnvs());
+function setupInspection() {
+  vi.stubEnv('INSTAGRAM_DELETE_FACEBOOK_ACCESS_TOKEN', 'facebook-secret');
+  vi.stubEnv('INSTAGRAM_DELETE_FACEBOOK_ACCOUNT_ID', '123');
+  m.meta.mockReset();
+  m.meta.mockResolvedValueOnce({ id: '123', username: 'smartbrewmrl' });
+}
+it('reads the configured Facebook account without database writes or portal credentials', async () => {
+  setupInspection();
+  const result = await inspectFacebookInstagramAction('product');
+  expect(result).toMatchObject({ success: true, account: { id: '123', username: 'smartbrewmrl' } });
+  expect(m.meta).toHaveBeenCalledWith(expect.any(String), 'https://graph.facebook.com/v26.0/123?fields=id,username', expect.objectContaining({ method: 'GET', cache: 'no-store', headers: { Authorization: 'Bearer facebook-secret' } }));
+  expect(JSON.stringify(result)).not.toContain('facebook-secret');
+  expect(m.list).not.toHaveBeenCalled(); expect(m.update).not.toHaveBeenCalled(); expect(m.transaction).not.toHaveBeenCalled();
+});
+it.each(['123', '999'])('reports the actual publication owner %s without changing records', async owner => {
+  setupInspection(); m.meta.mockResolvedValueOnce({ id: '222', owner: { id: owner } });
+  const result = await inspectFacebookInstagramAction('product', 'publication');
+  expect(result).toMatchObject({ success: true, publication: { id: '222', ownerId: owner, matches: owner === '123' } });
+  expect(m.list).toHaveBeenCalledWith({ where: { id: 'publication', draft: { productId: 'product' }, platform: 'INSTAGRAM', status: 'PUBLISHED', deletedAt: null } });
+  expect(m.update).not.toHaveBeenCalled(); expect(m.transaction).not.toHaveBeenCalled();
+});
+it('rejects missing or cross-product publications before contacting Meta', async () => {
+  setupInspection(); m.list.mockResolvedValue([]);
+  expect((await inspectFacebookInstagramAction('product', 'other')).success).toBe(false);
+  expect(m.meta).not.toHaveBeenCalled();
+});
+it('requires authentication for inspection', async () => {
+  setupInspection(); m.auth.mockResolvedValue(null);
+  expect((await inspectFacebookInstagramAction('product')).success).toBe(false);
+  expect(m.meta).not.toHaveBeenCalled();
+});
+it('rejects malformed inputs and missing Facebook configuration', async () => {
+  expect((await inspectFacebookInstagramAction('product')).success).toBe(false);
+  setupInspection();
+  expect((await inspectFacebookInstagramAction('')).success).toBe(false);
+  expect((await inspectFacebookInstagramAction('product', '')).success).toBe(false);
+  expect(m.meta).not.toHaveBeenCalled();
+});
+it('rejects an unexpected account identity', async () => {
+  setupInspection(); m.meta.mockReset().mockResolvedValue({ id: '999', username: 'other' });
+  expect((await inspectFacebookInstagramAction('product')).success).toBe(false);
+});
+it.each([{}, { id: '222' }, { id: '999', owner: { id: '123' } }])('does not confirm incomplete or mismatched media responses', async media => {
+  setupInspection(); m.meta.mockResolvedValueOnce(media);
+  expect((await inspectFacebookInstagramAction('product', 'publication')).success).toBe(false);
+});
+it.each([190, 100, 10])('sanitizes provider errors (code %s)', async code => {
+  setupInspection(); m.meta.mockReset().mockRejectedValue(new MetaApiError({ operation: 'read', message: 'facebook-secret', status: 400, error: { code } }));
+  const result = await inspectFacebookInstagramAction('product');
+  expect(result.success).toBe(false);
+  expect(JSON.stringify(result)).not.toContain('facebook-secret');
+  expect(m.update).not.toHaveBeenCalled();
+});
 it('requires an admin session before every operation', async () => {
   m.auth.mockResolvedValue(null);
   expect((await publishToInstagramAction(['product'])).success).toBe(false);

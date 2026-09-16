@@ -1,5 +1,13 @@
 # Publicaciones: seguridad y despliegue
 
+## Verificación visible mediante Facebook Login
+
+En `/admin/products/[id]`, la sección «Verificación de Instagram mediante Facebook» permite consultar la cuenta (`id,username`) y, seleccionando una publicación activa del producto, su `id,owner`. Usa exclusivamente la configuración `INSTAGRAM_DELETE_FACEBOOK_*` del servidor, no la conexión del portal. Ambas consultas son GET sin caché y con timeout de 10 segundos cada una. La acción exige sesión administrativa, valida los identificadores y busca la publicación dentro del producto antes de consultar Meta.
+
+La interfaz muestra los IDs, usuario, resultado de comparación de propietario y fecha de consulta. Un propietario diferente nunca aparece como verificado. Los errores no confirman eliminación. No se escriben registros ni se cambian estados; tampoco se exponen tokens ni respuestas crudas del proveedor. Esta comprobación puntual no sustituye la verificación que se realiza al eliminar. No requiere nuevas variables ni migraciones. Para la grabación de revisión, usar una publicación activa y mostrar ambos botones y sus resultados; no mostrar credenciales.
+
+## Despliegue y seguridad de publicaciones
+
 Antes de desplegar, aplicar `prisma/manual/20260915_publication_soft_delete.sql` a la base del entorno y regenerar Prisma Client. La migración es aditiva; no elimina registros. No se ejecutó automáticamente en producción.
 
 Cada intento conserva su propia Publication. La reserva UPLOADING se crea en una transacción que bloquea la fila Product con SELECT FOR UPDATE. Todas las publicaciones de todos los borradores del producto se consideran para impedir duplicados entre instancias. La transacción termina antes de llamar a Meta.

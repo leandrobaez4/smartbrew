@@ -107,6 +107,41 @@ function deletionConfig() {
   if (!/^\d+$/.test(accountId) || !/^v\d+\.0$/.test(version)) throw new PublicationError('Configuración de eliminación inválida.');
   return { token, accountId, root: `https://graph.facebook.com/${version}` };
 }
+
+// Read-only diagnostics for the Facebook Login integration, not the portal token.
+export async function inspectFacebookInstagramAction(productId: string, publicationId?: string) {
+  try {
+    await requireAdmin();
+    if (typeof productId !== 'string' || !productId || productId.length > 128 ||
+        (publicationId !== undefined && (typeof publicationId !== 'string' || !publicationId || publicationId.length > 128))) {
+      throw new PublicationError('Seleccioná un producto y una publicación válidos.');
+    }
+    const c = deletionConfig();
+    let externalMediaId: string | undefined;
+    if (publicationId !== undefined) {
+      const records = await prisma.publication.findMany({ where: { id: publicationId, draft: { productId }, platform: 'INSTAGRAM', status: 'PUBLISHED', deletedAt: null } });
+      const record = records.find(p => p.id === publicationId);
+      if (!record?.externalMediaId || !/^\d+$/.test(record.externalMediaId)) throw new PublicationError('No hay una publicación activa válida para verificar.');
+      externalMediaId = record.externalMediaId;
+    }
+    const read = () => ({ method: 'GET', headers: { Authorization: `Bearer ${c.token}` }, cache: 'no-store' as const, signal: AbortSignal.timeout(10000) });
+    const account = await requestMeta<{ id?: string; username?: string }>('consultar cuenta mediante Facebook Login', `${c.root}/${c.accountId}?fields=id,username`, read());
+    if (account?.id !== c.accountId || typeof account.username !== 'string' || !account.username || account.username.length > 100) throw new PublicationError('Meta no confirmó la identidad de la cuenta configurada.');
+    let publication: { id: string; ownerId: string; matches: boolean } | undefined;
+    if (externalMediaId) {
+      const media = await requestMeta<{ id?: string; owner?: { id?: string } }>('consultar propietario de publicación', `${c.root}/${externalMediaId}?fields=id,owner`, read());
+      if (media?.id !== externalMediaId || typeof media.owner?.id !== 'string' || !/^\d+$/.test(media.owner.id)) throw new PublicationError('No se pudo verificar el propietario. Esto no confirma que la publicación haya sido eliminada.');
+      publication = { id: media.id, ownerId: media.owner.id, matches: media.owner.id === account.id };
+    }
+    return { success: true as const, account: { id: account.id, username: account.username }, publication, checkedAt: new Date().toISOString() };
+  } catch (error) {
+    // Do not return raw provider errors, URLs, tokens or response bodies to the browser.
+    const message = error instanceof PublicationError ? error.message : error instanceof MetaApiError && error.code === 190
+      ? 'El token de Facebook venció o no es válido. Revisá la configuración del servidor.'
+      : 'No se pudo completar la consulta a Meta. Revisá permisos, configuración y disponibilidad. No se modificó ningún registro.';
+    return { success: false as const, message };
+  }
+}
 async function deletePublication(productId: string, publicationId: string, c: ReturnType<typeof deletionConfig>) {
   const claim = await prisma.$transaction(async tx => {
     const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`;
