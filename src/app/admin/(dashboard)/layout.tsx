@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { logoutAction } from '../login/actions';
-import { Package, FileText, Share2 } from 'lucide-react';
+import { Camera, Package, FileText, Share2 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,7 +12,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <h1 className="text-xl font-bold text-gray-800 dark:text-white">SmartBrew Admin</h1>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <Link href="/admin/instagram" className="block p-2 text-cyan-600">Accesos a Instagram</Link>
+          <Link href="/admin/instagram" className="flex items-center space-x-2 p-2 text-cyan-600 dark:text-cyan-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <Camera size={20} className="shrink-0" aria-hidden="true" />
+            <span>Accesos a Instagram</span>
+          </Link>
           <Link href="/admin/products" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <Package size={20} />
             <span>Productos</span>

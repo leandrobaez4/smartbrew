@@ -11,10 +11,10 @@ export function instagramLoginConfig() {
   return { clientId, clientSecret, origin: origin.origin, redirectUri: `${origin.origin}/api/instagram/callback`, version };
 }
 
-export function authorizationUrl(state: string) {
+export function authorizationUrl(state: string, reviewPublishing = false) {
   const config = instagramLoginConfig();
   const url = new URL('https://www.instagram.com/oauth/authorize');
-  url.search = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirectUri, response_type: 'code', scope: 'instagram_business_basic', state, enable_fb_login: '0', force_authentication: '1' }).toString();
+  url.search = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirectUri, response_type: 'code', scope: reviewPublishing ? 'instagram_business_basic,instagram_business_content_publish' : 'instagram_business_basic', state, enable_fb_login: '0', force_authentication: '1' }).toString();
   return url.toString();
 }
 

@@ -15,6 +15,11 @@ it('requests Basic only and uses a fixed redirect without a client secret', () =
   expect(url.searchParams.get('redirect_uri')).toBe('https://www.smartbrew.tech/api/instagram/callback');
   expect(url.toString()).not.toContain('private-secret');
 });
+it('requests publishing only when explicitly enabled for the review portal', () => {
+  const url = new URL(authorizationUrl('nonce', true));
+  expect(url.searchParams.get('scope')).toBe('instagram_business_basic,instagram_business_content_publish');
+  expect(url.toString()).not.toContain('private-secret');
+});
 it('exchanges code server-side and gets profile from Instagram, never Facebook', async () => {
   const fetchMock = vi.fn()
     .mockResolvedValueOnce(Response.json({ access_token: 'short' }))

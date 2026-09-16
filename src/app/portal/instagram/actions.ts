@@ -9,7 +9,7 @@ export async function connectInstagram() {
   const session = await requirePortal();
   const state = randomSecret();
   let url: string;
-  try { url = authorizationUrl(state); } catch { redirect('/portal/instagram?status=configuration'); }
+  try { url = authorizationUrl(state, Boolean(session.member.reviewExpiresAt)); } catch { redirect('/portal/instagram?status=configuration'); }
   await portalDb.portalSession.update({ where: { tokenHash: session.tokenHash }, data: { oauthStateHash: hashSecret(state), oauthExpiresAt: new Date(Date.now() + 10 * 60000) } });
   redirect(url);
 }

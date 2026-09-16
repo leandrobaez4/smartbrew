@@ -53,6 +53,17 @@ model InstagramConnection {
   updatedAt DateTime @updatedAt
 }
 
+// Separate from production products/publications. One durable attempt per review access.
+model ReviewPublication {
+  memberId    String @id
+  instagramId String
+  status      String @default("PROCESSING")
+  containerId String?
+  mediaId     String?
+  message     String?
+  createdAt   DateTime @default(now())
+}
+
 model Product {
   id                   String   @id @default(cuid())
   marketplace          String   @default("MERCADO_LIBRE")
