@@ -18,6 +18,8 @@ it('redirects unauthenticated portal visitors', async () => {
 it.each([
   { expiresAt: new Date(0), member: { disabled: false } },
   { expiresAt: new Date(Date.now() + 60000), member: { disabled: true } },
+  { expiresAt: new Date(Date.now() + 60000), member: { disabled: false, reviewExpiresAt: new Date(0), reviewTokenHash: 'hash' } },
+  { expiresAt: new Date(Date.now() + 60000), member: { disabled: false, reviewExpiresAt: new Date(Date.now() + 60000), reviewTokenHash: null } },
 ])('rejects expired/revoked sessions', async session => {
   mocks.cookie.mockReturnValue({ value: 'a'.repeat(64) });
   mocks.find.mockResolvedValue(session);

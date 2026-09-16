@@ -43,9 +43,25 @@ export async function revokeMember(form: FormData) {
   await requireAdmin();
   const id = String(form.get('memberId'));
   await portalDb.$transaction([
-    portalDb.portalMember.update({ where: { id }, data: { disabled: true, inviteHash: null } }),
+    portalDb.portalMember.update({ where: { id }, data: { disabled: true, inviteHash: null, reviewTokenHash: null } }),
     portalDb.portalSession.deleteMany({ where: { memberId: id } }),
     portalDb.instagramConnection.deleteMany({ where: { memberId: id } }),
   ]);
   revalidatePath('/admin/instagram');
+}
+
+export async function createMetaReviewAccess(_state: { message: string; token?: string; expiresAt?: string }, form: FormData) {
+  await requireAdmin();
+  if (form.get('confirmed') !== 'on') return { message: 'Confirmá que este acceso es exclusivamente para la revisión de Meta.' };
+  const token = randomSecret();
+  const expiresAt = new Date(Date.now() + 60 * 86400000);
+  try {
+    await portalDb.portalMember.create({ data: {
+      // Reserved non-deliverable identifier; no email is sent or Meta identity implied.
+      email: `meta-review-${randomSecret()}@review.invalid`,
+      reviewTokenHash: hashSecret(token), reviewExpiresAt: expiresAt,
+    } });
+  } catch { return { message: 'No se pudo crear el acceso de revisión. Revisá que la migración esté aplicada.' }; }
+  revalidatePath('/admin/instagram');
+  return { message: 'Acceso creado. Guardá el enlace privado: se muestra solo ahora. No otorga permisos administrativos.', token, expiresAt: expiresAt.toISOString() };
 }

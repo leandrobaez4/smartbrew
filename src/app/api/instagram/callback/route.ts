@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const encryptedToken = sealToken(token.token, session.memberId);
     await portalDb.$transaction(async tx => {
       // Serialize with member revocation, and re-check session after the network calls.
-      const active = await tx.portalMember.updateMany({ where: { id: session.memberId, disabled: false }, data: { disabled: false } });
+      const active = await tx.portalMember.updateMany({ where: { id: session.memberId, disabled: false, OR: [{ reviewExpiresAt: null }, { reviewExpiresAt: { gt: new Date() }, reviewTokenHash: { not: null } }] }, data: { disabled: false } });
       if (!active.count) throw new Error('Member disabled');
       // Lock and consume the in-flight attempt. Disconnect/logout/new login can cancel it.
       const completed = await tx.portalSession.updateMany({ where: { tokenHash: session.tokenHash, oauthStateHash: pending, oauthExpiresAt: { gt: new Date() }, expiresAt: { gt: new Date() } }, data: { oauthStateHash: null, oauthExpiresAt: null } });

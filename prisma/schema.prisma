@@ -22,6 +22,8 @@ model PortalMember {
   passwordHash String?
   inviteHash   String? @unique
   inviteExpiresAt DateTime?
+  reviewTokenHash String? @unique
+  reviewExpiresAt DateTime?
   disabled     Boolean @default(false)
   loginAttempts Int @default(0)
   loginWindowEnd DateTime?

@@ -21,7 +21,7 @@ export default async function InstagramPage({ searchParams }: { searchParams: Pr
   let configured = true;
   try { instagramLoginConfig(); } catch { configured = false; }
   const button = 'rounded bg-cyan-700 px-4 py-3 text-white disabled:opacity-50';
-  return <><h1 className="text-3xl font-bold">Conectar Instagram</h1><p>{session.member.email}</p>
+  return <><h1 className="text-3xl font-bold">Conectar Instagram</h1><p>{session.member.reviewExpiresAt ? `Cuenta de revisión de Meta · Acceso hasta ${session.member.reviewExpiresAt.toISOString()}` : session.member.email}</p>
     <p>Conectá una cuenta profesional para consultar su usuario e identificador. Esta prueba solicita únicamente instagram_business_basic; no publica ni envía mensajes.</p>
     {status && messages[status] && <p role="status" className="rounded border border-cyan-700 p-4">{messages[status]}</p>}
     {!configured && <p role="alert">Conexión no disponible: falta configuración del servidor.</p>}

@@ -11,7 +11,7 @@ export async function portalLogin(_state: { error: string }, form: FormData) {
   if (!parsed.success) return failure;
   const { email, password, code } = parsed.data;
   const member = await portalDb.portalMember.findUnique({ where: { email } });
-  if (!member || member.disabled) return failure;
+  if (!member || member.disabled || member.reviewExpiresAt) return failure;
   // Database-backed limit; increment atomically before expensive password verification.
   const now = new Date();
   await portalDb.portalMember.updateMany({ where: { id: member.id, OR: [{ loginWindowEnd: null }, { loginWindowEnd: { lte: now } }] }, data: { loginAttempts: 0, loginWindowEnd: new Date(Date.now() + 15 * 60000) } });

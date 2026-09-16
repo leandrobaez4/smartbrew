@@ -20,6 +20,7 @@ export async function portalSession() {
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
   const session = await portalDb.portalSession.findUnique({ where: { tokenHash: hashSecret(token) }, include: { member: true } });
   if (!session || session.expiresAt <= new Date() || session.member.disabled) return null;
+  if (session.member.reviewExpiresAt && (!session.member.reviewTokenHash || session.member.reviewExpiresAt <= new Date())) return null;
   return session;
 }
 
@@ -29,13 +30,15 @@ export async function requirePortal() {
   return session;
 }
 
-export async function startPortalSession(memberId: string) {
+export async function startPortalSession(memberId: string, accessDeadline?: Date) {
   const jar = await cookies();
   const old = jar.get(cookieName)?.value;
   if (old) await portalDb.portalSession.deleteMany({ where: { tokenHash: hashSecret(old) } });
   const token = randomSecret();
-  await portalDb.portalSession.create({ data: { tokenHash: hashSecret(token), memberId, expiresAt: new Date(Date.now() + 86400000) } });
-  jar.set(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 86400 });
+  const expiresAt = new Date(Math.min(Date.now() + 86400000, accessDeadline?.getTime() ?? Infinity));
+  if (expiresAt <= new Date()) throw new Error('Access expired');
+  await portalDb.portalSession.create({ data: { tokenHash: hashSecret(token), memberId, expiresAt } });
+  jar.set(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)) });
 }
 
 export async function endPortalSession() {
