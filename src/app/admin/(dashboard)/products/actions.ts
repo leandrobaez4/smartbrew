@@ -4,10 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/session';
 import { logSystemEvent } from '@/lib/logger';
 import { MetaApiError, requestMeta } from '@/lib/meta-api';
+import { InstagramContainerError, waitForInstagramContainer } from '@/lib/instagram-container';
 
 const prisma = new PrismaClient();
 class PublicationError extends Error {}
-const errorMessage = (e: unknown) => e instanceof PublicationError || e instanceof MetaApiError
+const errorMessage = (e: unknown) => e instanceof PublicationError || e instanceof MetaApiError || e instanceof InstagramContainerError
   ? e.message : 'No se pudo completar la operación. Revisá el estado antes de reintentar.';
 async function requireAdmin() {
   if (!await getSession()) throw new PublicationError('Iniciá sesión como administrador.');
@@ -61,6 +62,7 @@ async function publishOne(productId: string) {
     });
     const containerId = mediaId(container);
     await prisma.publication.update({ where: { id: claim.id }, data: { externalContainerId: containerId, status: 'PROCESSING' } });
+    await waitForInstagramContainer(c.root, c.token, containerId);
     publishAttempted = true;
     const response = await requestMeta<{ id: string }>('publicar contenedor de Instagram', `${c.root}/${c.accountId}/media_publish`, {
       method: 'POST', headers: { Authorization: `Bearer ${c.token}` }, body: new URLSearchParams({ creation_id: containerId }),
@@ -72,8 +74,12 @@ async function publishOne(productId: string) {
     await logSystemEvent('INFO', 'instagram_publish', 'Publicación confirmada por Instagram y guardada.', { productId, publicationId: claim.id, externalMediaId: confirmedId });
   } catch (error) {
     // Never retry an ambiguous external side effect automatically.
-    const uncertain = Boolean(confirmedId) || (publishAttempted && !(error instanceof MetaApiError && !error.retryable));
-    const message = uncertain ? 'Resultado de publicación incierto. Requiere conciliación; no vuelvas a publicar para evitar duplicados.' : errorMessage(error);
+    const containerPending = error instanceof InstagramContainerError && error.pending;
+    const mediaNotReady = error instanceof MetaApiError && error.code === 9007 && error.subcode === 2207027;
+    const uncertain = containerPending || mediaNotReady || Boolean(confirmedId) || (publishAttempted && !(error instanceof MetaApiError && !error.retryable));
+    const message = containerPending ? errorMessage(error) : mediaNotReady
+      ? 'Meta aún no permite publicar el contenedor (9007/2207027). Se conserva el mismo intento para revisión; no vuelvas a crear otra publicación.'
+      : uncertain ? 'Resultado de publicación incierto. Requiere conciliación; no vuelvas a publicar para evitar duplicados.' : errorMessage(error);
     try {
       await prisma.publication.update({ where: { id: claim.id }, data: {
         status: uncertain ? 'PROCESSING' : 'FAILED', lastErrorCode: uncertain ? 'RECONCILIATION_REQUIRED' : 'META_REJECTED', lastErrorMessage: message,

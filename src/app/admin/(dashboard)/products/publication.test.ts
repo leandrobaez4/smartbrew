@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ auth: vi.fn(), transaction: vi.fn(), lock: vi.fn(), product: vi.fn(), active: vi.fn(), draft: vi.fn(), create: vi.fn(), update: vi.fn(), list: vi.fn(), meta: vi.fn(), audit: vi.fn() }));
+const m = vi.hoisted(() => ({ auth: vi.fn(), transaction: vi.fn(), lock: vi.fn(), product: vi.fn(), active: vi.fn(), draft: vi.fn(), create: vi.fn(), update: vi.fn(), list: vi.fn(), meta: vi.fn(), audit: vi.fn(), wait: vi.fn() }));
 vi.mock('@prisma/client', () => ({ PrismaClient: class {
   $transaction = m.transaction;
   publication = { update: m.update, findMany: m.list };
@@ -8,6 +8,8 @@ vi.mock('@/lib/session', () => ({ getSession: m.auth }));
 vi.mock('@/lib/logger', () => ({ logSystemEvent: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/meta-api', async () => ({ ...await import('../../../../lib/meta-api'), requestMeta: m.meta }));
+vi.mock('@/lib/instagram-container', async () => ({ ...await import('../../../../lib/instagram-container'), waitForInstagramContainer: m.wait }));
+import { InstagramContainerError } from '../../../../lib/instagram-container';
 import { MetaApiError } from '@/lib/meta-api';
 import { publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction, reconcileInstagramPublicationAction } from './actions';
 import { runPublicationAction } from '../../../../lib/publication-client';
@@ -214,4 +216,22 @@ it('blocks a competing request once the serialized claim is visible', async () =
 });
 it('client treats a lost action response as a failure', async () => {
   expect(await runPublicationAction(async () => { throw Error('network'); })).toMatchObject({ success: false });
+});
+it('persists the container and waits before calling media_publish', async () => {
+  expect((await publishToInstagramAction(['product'])).success).toBe(true);
+  expect(m.wait).toHaveBeenCalledWith('https://graph.instagram.com/v21.0', 'test-token', '111');
+  expect(m.update.mock.invocationCallOrder[0]).toBeLessThan(m.wait.mock.invocationCallOrder[0]);
+  expect(m.wait.mock.invocationCallOrder[0]).toBeLessThan(m.meta.mock.invocationCallOrder[1]);
+});
+it.each([true, false])('preserves pending containers but fails terminal processing errors (pending=%s)', async pending => {
+  m.wait.mockRejectedValue(new InstagramContainerError('Processing result', pending));
+  expect((await publishToInstagramAction(['product'])).success).toBe(false);
+  expect(m.meta).toHaveBeenCalledTimes(1);
+  expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: pending ? 'PROCESSING' : 'FAILED' }) }));
+});
+it('keeps the same container blocked if Meta still returns 9007 after FINISHED', async () => {
+  m.meta.mockReset().mockResolvedValueOnce({ id: '111' }).mockRejectedValueOnce(new MetaApiError({ operation: 'publish', status: 400, message: 'Not ready', error: { code: 9007, error_subcode: 2207027 } }));
+  expect((await publishToInstagramAction(['product'])).success).toBe(false);
+  expect(m.create).toHaveBeenCalledTimes(1);
+  expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PROCESSING', lastErrorCode: 'RECONCILIATION_REQUIRED' }) }));
 });

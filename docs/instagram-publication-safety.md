@@ -6,6 +6,8 @@ Cada intento conserva su propia Publication. La reserva UPLOADING se crea en una
 
 Se guarda externalContainerId antes de media_publish. Solo un ID válido de Meta y un guardado exitoso producen éxito en pantalla. Si la respuesta es incierta o falla el guardado tras publicar, PROCESSING bloquea nuevos intentos. No hay vencimiento automático del bloqueo: podría existir un post real. Conciliar con el contenedor, ID remoto y cuenta de Instagram antes de cambiarlo. Un proceso terminado abruptamente también requiere conciliación.
 
+Antes de media_publish se consulta el mismo contenedor hasta obtener status_code FINISHED, con una espera máxima de 20 segundos, pausas de 2 segundos y consultas de hasta 5 segundos (acotadas por el tiempo restante). ERROR o EXPIRED termina el intento como FAILED sin publicar. Si sigue IN_PROGRESS, no se puede consultar su estado o devuelve un estado inesperado, se conserva PROCESSING para revisión. El error 9007/2207027 al publicar también conserva ese bloqueo y el ID del contenedor. No hay reanudación automática ni creación de otro contenedor al agotarse la espera; la conciliación administrativa de la interfaz no libera registros PROCESSING. Este cambio no requiere variables nuevas ni migraciones.
+
 La verificación es de solo lectura: un 400/404, token inválido o falta de permisos no confirma eliminación. Ninguna de estas respuestas borra filas ni relaciones.
 
 La eliminación remota usa DELETE /<IG_MEDIA_ID> con Facebook Login, documentado en https://developers.facebook.com/documentation/instagram-platform/reference/instagram-media y anunciado el 3 de diciembre de 2025 en el changelog. No archiva: elimina el post. La configuración es independiente de publicación y mensajes:
