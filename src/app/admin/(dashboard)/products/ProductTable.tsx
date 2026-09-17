@@ -8,6 +8,7 @@ import { ProductStatus } from '@prisma/client';
 import { Camera, Trash2, CheckCircle2, Loader2, Eye, ExternalLink } from 'lucide-react';
 import { publishToInstagramAction, unpublishFromInstagramAction } from './actions';
 import ProductPreviewModal from './ProductPreviewModal';
+import type { ProductSort, SortDirection } from '@/lib/product-list';
 
 export type ProductData = {
   id: string;
@@ -24,7 +25,9 @@ export type ProductData = {
   isPublished: boolean;
 };
 
-export default function ProductTable({ products, total, page, totalPages, search, statusFilter }: { 
+export default function ProductTable({ products, total, page, totalPages, search, statusFilter, sort, direction }: {
+  sort: ProductSort,
+  direction: SortDirection,
   products: ProductData[], 
   total: number, 
   page: number, 
@@ -42,8 +45,28 @@ export default function ProductTable({ products, total, page, totalPages, search
   if (page > 1) currentParams.set('page', page.toString());
   if (search) currentParams.set('search', search);
   if (statusFilter && statusFilter !== 'ALL') currentParams.set('status', statusFilter);
+  currentParams.set('sort', sort);
+  currentParams.set('direction', direction);
   const currentQueryString = currentParams.toString();
   const backUrl = `/admin/products${currentQueryString ? `?${currentQueryString}` : ''}`;
+  const pageUrl = (nextPage: number) => {
+    const params = new URLSearchParams(currentParams);
+    params.set('page', String(nextPage));
+    return `?${params}`;
+  };
+  const sortHeader = (column: ProductSort, label: string) => (
+    <th scope="col" aria-sort={sort === column ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+      <button type="button" className="inline-flex items-center gap-2 cursor-pointer hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => {
+        const params = new URLSearchParams(currentParams);
+        params.delete('page');
+        params.set('sort', column);
+        params.set('direction', sort === column && direction === 'asc' ? 'desc' : 'asc');
+        router.push(`/admin/products?${params}`);
+      }}>
+        {label}<span aria-hidden="true">{sort === column ? (direction === 'asc' ? '↑' : '↓') : '↕'}</span>
+      </button>
+    </th>
+  );
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
@@ -103,9 +126,10 @@ export default function ProductTable({ products, total, page, totalPages, search
                     className="rounded border-gray-300 dark:border-gray-700"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Producto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Instagram</th>
+                {sortHeader('title', 'Producto')}
+                {sortHeader('status', 'Estado')}
+                {sortHeader('instagram', 'Instagram')}
+                {sortHeader('affiliate', 'Link de afiliado')}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
@@ -155,6 +179,11 @@ export default function ProductTable({ products, total, page, totalPages, search
                       <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                     )}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {product.affiliateUrl?.trim() ? (
+                      <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400"><CheckCircle2 size={16} /> Sí</span>
+                    ) : <span className="text-gray-500 dark:text-gray-400">No</span>}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-3">
                       <button
@@ -187,7 +216,7 @@ export default function ProductTable({ products, total, page, totalPages, search
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No se encontraron productos.</td>
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No se encontraron productos.</td>
                 </tr>
               )}
             </tbody>
@@ -201,12 +230,12 @@ export default function ProductTable({ products, total, page, totalPages, search
         </div>
         <div className="flex gap-2">
           {page > 1 && (
-            <Link href={`?page=${page - 1}&search=${search}&status=${statusFilter}`} className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <Link href={pageUrl(page - 1)} className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               Anterior
             </Link>
           )}
           {page < totalPages && (
-            <Link href={`?page=${page + 1}&search=${search}&status=${statusFilter}`} className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <Link href={pageUrl(page + 1)} className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               Siguiente
             </Link>
           )}

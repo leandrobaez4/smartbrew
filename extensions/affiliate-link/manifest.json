@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "SmartBrew · Prueba de enlace afiliado",
+  "version": "0.2.0",
+  "description": "Prueba manual de generación de un enlace en la pestaña de Mercado Libre abierta.",
+  "permissions": ["activeTab", "scripting"],
+  "action": { "default_popup": "popup.html" }
+}

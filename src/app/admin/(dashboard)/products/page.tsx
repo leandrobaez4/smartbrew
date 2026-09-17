@@ -1,14 +1,18 @@
 import { PrismaClient, ProductStatus } from '@prisma/client';
 import Link from 'next/link';
 import ProductTable from './ProductTable';
+import { parseProductSort, parseSortDirection, productListQuery } from '@/lib/product-list';
 
 export const dynamic = 'force-dynamic';
 
 const prisma = new PrismaClient();
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ page?: string, search?: string, status?: string }> }) {
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ page?: string, search?: string, status?: string, sort?: string, direction?: string }> }) {
   const sp = await searchParams;
-  const page = parseInt(sp.page || '1');
+  const requestedPage = Number(sp.page || '1');
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const sort = parseProductSort(sp.sort);
+  const direction = parseSortDirection(sp.direction);
   const limit = 20;
   const skip = (page - 1) * limit;
 
@@ -16,16 +20,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   if (sp.search) {
     where.title = { contains: sp.search, mode: 'insensitive' };
   }
-  if (sp.status && sp.status !== 'ALL') {
+  if (sp.status && Object.values(ProductStatus).includes(sp.status as ProductStatus)) {
     where.status = sp.status as ProductStatus;
   }
 
+  const orderedIds = await prisma.$queryRaw<{ id: string }[]>(productListQuery(sp.search || '', where.status || '', sort, direction, skip, limit));
   const [productsRaw, total] = await Promise.all([
     prisma.product.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
+      where: { id: { in: orderedIds.map(p => p.id) } },
       include: {
         drafts: {
           include: {
@@ -40,7 +42,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const totalPages = Math.ceil(total / limit);
 
   // Mapeamos para determinar si está publicado en Instagram
-  const products = productsRaw.map(p => {
+  const positions = new Map(orderedIds.map((p, index) => [p.id, index]));
+  const products = productsRaw.sort((a, b) => positions.get(a.id)! - positions.get(b.id)!).map(p => {
     // Revisar si tiene alguna publicacion con status PUBLISHED en algun draft
     const isPublished = p.drafts.some(d => 
       d.publications.some(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED' && !pub.deletedAt)
@@ -73,6 +76,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
       <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-4 mb-6 border border-gray-200 dark:border-gray-800">
         <form method="GET" className="flex gap-4 items-end">
+          <input type="hidden" name="sort" value={sort} />
+          <input type="hidden" name="direction" value={direction} />
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Buscar</label>
             <input type="text" name="search" defaultValue={sp.search} className="mt-1 block w-full border border-gray-300 dark:border-gray-700 rounded-md p-2 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 focus:ring-blue-500 focus:border-blue-500" placeholder="Buscar por título..." />
@@ -96,6 +101,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       </div>
 
       <ProductTable 
+        key={`${page}:${sp.search || ''}:${sp.status || ''}:${sort}:${direction}`}
+        sort={sort}
+        direction={direction}
         products={products}
         total={total}
         page={page}
