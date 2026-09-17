@@ -10,7 +10,7 @@ test('chooses largest srcset candidate, deduplicates photo variants, excludes un
   globalThis.document = {
     querySelector: () => ({ content: small }),
     querySelectorAll: selector => {
-      assert.equal(selector, 'img.ui-pdp-image');
+      assert.equal(selector, 'img.ui-pdp-image.ui-pdp-gallery__figure__image');
       return [
         { src: small, naturalWidth: 100, getAttribute: key => key === 'srcset' ? `${small} 320w, ${large} 1200w` : null },
         { src: second, naturalWidth: 800, getAttribute: () => null },
@@ -29,7 +29,7 @@ test('ignores og:image and unrelated gallery elements when no product images exi
   globalThis.document = {
     querySelector: () => { assert.fail('must not read metadata images'); },
     querySelectorAll: selector => {
-      assert.equal(selector, 'img.ui-pdp-image');
+      assert.equal(selector, 'img.ui-pdp-image.ui-pdp-gallery__figure__image');
       return [];
     },
   };

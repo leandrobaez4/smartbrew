@@ -39,7 +39,7 @@ export async function requestAffiliateLink() {
     visit(data);
     if (links.size !== 1) return { ok: false, message: 'La API respondió, pero el formato del enlace no está reconocido o es ambiguo. Revisá el resultado en Mercado Libre antes de repetir.' };
     const title = document.querySelector('h1')?.textContent?.trim() || '';
-    const cover = document.querySelector('img.ui-pdp-image');
+    const cover = document.querySelector('img.ui-pdp-image.ui-pdp-gallery__figure__image');
     const image = cover?.currentSrc || cover?.getAttribute('data-src') || cover?.src || '';
     return { ok: true, link: [...links][0], product: { url: location.href, title, image }, message: 'Enlace recibido. Podés enviarlo a SmartBrew para confirmar su importación.' };
   } catch {

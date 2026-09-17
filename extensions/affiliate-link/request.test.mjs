@@ -41,12 +41,12 @@ test('reports 403 without exposing response or retrying', async () => {
   assert.match(result.message, /403/);
   assert.equal(calls, 1);
 });
-test('uses only a ui-pdp-image as the cover, never og:image', async () => {
+test('requires both product figure classes for the cover, never og:image', async () => {
   product();
   const image = 'https://http2.mlstatic.com/product.webp';
   globalThis.document = { querySelector: selector => {
     if (selector === 'h1') return { textContent: 'Reloj' };
-    assert.equal(selector, 'img.ui-pdp-image');
+    assert.equal(selector, 'img.ui-pdp-image.ui-pdp-gallery__figure__image');
     return { currentSrc: image };
   } };
   globalThis.fetch = async () => Response.json({ link: 'https://meli.la/test' });

@@ -5,8 +5,8 @@ export class InstagramContainerError extends Error {
 }
 
 // Bounded wait for a server action. Never hold a database transaction while polling.
-export async function waitForInstagramContainer(root: string, token: string, containerId: string) {
-  const deadline = Date.now() + 20_000;
+export async function waitForInstagramContainer(root: string, token: string, containerId: string, preparationDeadline = Infinity) {
+  const deadline = Math.min(Date.now() + 20_000, preparationDeadline);
   while (Date.now() < deadline) {
     let data: { status_code?: string; status?: string };
     try {

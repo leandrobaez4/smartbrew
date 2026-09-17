@@ -32,6 +32,41 @@ beforeEach(() => {
   m.list.mockResolvedValue([{ id: 'publication', externalMediaId: '222' }]);
 });
 afterEach(() => vi.unstubAllEnvs());
+it('publishes all unique images as one ordered carousel, with caption on the parent only', async () => {
+  m.product.mockResolvedValue({ id: 'product', affiliateUrl: 'https://example.org/product', primaryImageUrl: 'https://example.org/a.jpg', imageUrls: ['https://example.org/a.jpg', 'https://example.org/b.jpg', 'https://example.org/c.jpg'] });
+  m.meta.mockReset();
+  m.meta.mockResolvedValueOnce({ id: '11' }).mockResolvedValueOnce({ id: '12' }).mockResolvedValueOnce({ id: '13' }).mockResolvedValueOnce({ id: '100' }).mockResolvedValueOnce({ id: '200' });
+  expect((await publishToInstagramAction(['product'])).success).toBe(true);
+  expect(m.meta).toHaveBeenCalledTimes(5);
+  for (let index = 0; index < 3; index++) {
+    const body = m.meta.mock.calls[index][2].body;
+    expect(body.get('is_carousel_item')).toBe('true');
+    expect(body.has('caption')).toBe(false);
+    expect(body.get('image_url')).toBe(`https://example.org/${['a', 'b', 'c'][index]}.jpg`);
+  }
+  const parent = m.meta.mock.calls[3][2].body;
+  expect(parent.get('media_type')).toBe('CAROUSEL');
+  expect(parent.get('children')).toBe('11,12,13');
+  expect(parent.get('caption')).toContain('Comentá');
+  expect(m.meta.mock.calls[4][2].body.get('creation_id')).toBe('100');
+  expect(m.wait.mock.calls.map(call => call[2])).toEqual(['11', '12', '13', '100']);
+  expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PUBLISHED', externalMediaId: '200' }) }));
+});
+it('does not publish an incomplete carousel if a child fails', async () => {
+  m.product.mockResolvedValue({ id: 'product', affiliateUrl: 'https://example.org/product', primaryImageUrl: 'https://example.org/a.jpg', imageUrls: ['https://example.org/b.jpg'] });
+  m.meta.mockReset().mockResolvedValueOnce({ id: '11' }).mockResolvedValueOnce({ id: '12' });
+  m.wait.mockRejectedValueOnce(new InstagramContainerError('Invalid image', false)).mockResolvedValueOnce(undefined);
+  expect((await publishToInstagramAction(['product'])).success).toBe(false);
+  expect(m.meta).toHaveBeenCalledTimes(2);
+  expect(m.meta.mock.calls.some(call => call[1].endsWith('/media_publish'))).toBe(false);
+  expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }));
+});
+it('rejects more than ten images without silently truncating or calling Meta', async () => {
+  m.product.mockResolvedValue({ id: 'product', affiliateUrl: 'https://example.org/product', primaryImageUrl: 'https://example.org/a.jpg', imageUrls: Array.from({ length: 10 }, (_, index) => `https://example.org/${index}.jpg`) });
+  expect((await publishToInstagramAction(['product'])).message).toContain('más de 10');
+  expect(m.meta).not.toHaveBeenCalled();
+  expect(m.create).not.toHaveBeenCalled();
+});
 it('includes the comment-to-DM invitation and affiliate link in product captions', async () => {
   expect((await publishToInstagramAction(['product'])).success).toBe(true);
   const caption = m.meta.mock.calls[0][2].body.get('caption');
@@ -284,7 +319,7 @@ it('client treats a lost action response as a failure', async () => {
 });
 it('persists the container and waits before calling media_publish', async () => {
   expect((await publishToInstagramAction(['product'])).success).toBe(true);
-  expect(m.wait).toHaveBeenCalledWith('https://graph.instagram.com/v21.0', 'test-token', '111');
+  expect(m.wait).toHaveBeenCalledWith('https://graph.instagram.com/v21.0', 'test-token', '111', expect.any(Number));
   expect(m.update.mock.invocationCallOrder[0]).toBeLessThan(m.wait.mock.invocationCallOrder[0]);
   expect(m.wait.mock.invocationCallOrder[0]).toBeLessThan(m.meta.mock.invocationCallOrder[1]);
 });

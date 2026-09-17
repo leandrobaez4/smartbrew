@@ -25,6 +25,13 @@ it('limits processing wait to twenty seconds', async () => {
   await result;
   expect(meta).toHaveBeenCalledTimes(10);
 });
+it('honors the shared preparation deadline for carousel children and parent', async () => {
+  meta.mockResolvedValue({ status_code: 'IN_PROGRESS' });
+  const result = expect(waitForInstagramContainer('https://graph.instagram.com/v26.0', 'token', '111', Date.now() + 1000)).rejects.toMatchObject({ pending: true });
+  await vi.advanceTimersByTimeAsync(1000);
+  await result;
+  expect(meta).toHaveBeenCalledTimes(1);
+});
 it.each(['ERROR', 'EXPIRED'])('fails safely on %s', async status_code => {
   meta.mockResolvedValue({ status_code });
   await expect(wait()).rejects.toMatchObject({ pending: false });

@@ -12,7 +12,7 @@ export function collectProductGallery() {
       if (!photos.has(key) || quality > photos.get(key).quality) photos.set(key, { url: url.href, quality });
     } catch { /* Ignore malformed image sources. */ }
   }
-  for (const img of document.querySelectorAll('img.ui-pdp-image')) {
+  for (const img of document.querySelectorAll('img.ui-pdp-image.ui-pdp-gallery__figure__image')) {
     for (const srcset of [img.getAttribute('srcset'), img.getAttribute('data-srcset')]) {
       for (const candidate of (srcset || '').split(',')) {
         const [url, descriptor] = candidate.trim().split(/\s+/);

@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { logSystemEvent } from '@/lib/logger';
 import { MetaApiError, requestMeta } from '@/lib/meta-api';
 import { InstagramContainerError, waitForInstagramContainer } from '@/lib/instagram-container';
+import { mergeProductImages } from './product-gallery';
 
 const prisma = new PrismaClient();
 export class PublicationError extends Error {}
@@ -39,6 +40,8 @@ export async function publishOne(productId: string) {
       ? 'Ya existe una publicación registrada. No se envió otra a Instagram. Si la borraste manualmente, su eliminación debe conciliarse sin perder el historial.'
       : 'Hay una publicación en curso o pendiente de conciliación. No se reintentará para evitar duplicados.');
     if (!product.affiliateUrl || !product.primaryImageUrl) throw new PublicationError('El producto necesita imagen y enlace de afiliado.');
+    const images = mergeProductImages([product.primaryImageUrl], product.imageUrls);
+    if (images.length > 10) throw new PublicationError('El producto tiene más de 10 imágenes. El carrusel admite hasta 10 en esta integración; ajustá la galería antes de publicar. No se publicaron imágenes ni se recortó la selección.');
     let draft = await tx.contentDraft.findFirst({ where: { productId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
     if (!draft) draft = await tx.contentDraft.create({ data: {
       productId, status: 'APPROVED', caption: `¡Mirá este producto! ${product.title}`,
@@ -49,17 +52,38 @@ export async function publishOne(productId: string) {
     if (!caption.includes(commentPrompt)) caption += `\n\n${commentPrompt}`;
     if (!caption.includes(product.affiliateUrl)) caption += `\n\nLink: ${product.affiliateUrl}`;
     const publication = await tx.publication.create({ data: { contentDraftId: draft.id, platform: 'INSTAGRAM', status: 'UPLOADING', attemptCount: 1 } });
-    return { id: publication.id, image: product.primaryImageUrl, caption };
+    return { id: publication.id, images, caption };
   });
   let publishAttempted = false;
   let confirmedId: string | undefined;
   try {
-    const container = await requestMeta<{ id: string }>('crear contenedor de Instagram', `${c.root}/${c.accountId}/media`, {
-      method: 'POST', signal: AbortSignal.timeout(20000), headers: { Authorization: `Bearer ${c.token}` }, body: new URLSearchParams({ image_url: claim.image, caption: claim.caption }),
-    });
-    const containerId = mediaId(container);
+    // Shared preparation budget leaves time for media_publish and persistence within QStash's 90s timeout.
+    const preparationDeadline = Date.now() + 60_000;
+    async function createContainer(fields: Record<string, string>) {
+      const remaining = preparationDeadline - Date.now();
+      if (remaining <= 0) throw new InstagramContainerError('Se agotó el tiempo de preparación del carrusel. No se solicitó publicar.', true);
+      return mediaId(await requestMeta<{ id: string }>('crear contenedor de Instagram', `${c.root}/${c.accountId}/media`, {
+        method: 'POST', signal: AbortSignal.timeout(Math.min(20000, remaining)),
+        headers: { Authorization: `Bearer ${c.token}` }, body: new URLSearchParams(fields),
+      }));
+    }
+    let containerId: string;
+    if (claim.images.length === 1) {
+      containerId = await createContainer({ image_url: claim.images[0], caption: claim.caption });
+    } else {
+      // Await every child, preserve gallery order, and never publish a partial carousel.
+      const children = await Promise.allSettled(claim.images.map(async image => {
+        const id = await createContainer({ image_url: image, is_carousel_item: 'true' });
+        await waitForInstagramContainer(c.root, c.token, id, preparationDeadline);
+        return id;
+      }));
+      const failure = children.find(child => child.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
+      const ids = children.map(child => (child as PromiseFulfilledResult<string>).value);
+      containerId = await createContainer({ media_type: 'CAROUSEL', children: ids.join(','), caption: claim.caption });
+    }
     await prisma.publication.update({ where: { id: claim.id }, data: { externalContainerId: containerId, status: 'PROCESSING' } });
-    await waitForInstagramContainer(c.root, c.token, containerId);
+    await waitForInstagramContainer(c.root, c.token, containerId, preparationDeadline);
     publishAttempted = true;
     const response = await requestMeta<{ id: string }>('publicar contenedor de Instagram', `${c.root}/${c.accountId}/media_publish`, {
       method: 'POST', signal: AbortSignal.timeout(20000), headers: { Authorization: `Bearer ${c.token}` }, body: new URLSearchParams({ creation_id: containerId }),
