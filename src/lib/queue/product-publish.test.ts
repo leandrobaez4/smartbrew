@@ -18,11 +18,32 @@ it('enqueues one durable job and limits consumer concurrency, without calling Me
   expect(m.publish).toHaveBeenCalledWith(expect.objectContaining({ body: { jobId: 'job' }, flowControl: { key: 'smartbrew-product-publish', parallelism: 1 }, deduplicationId: 'job' }));
   expect(m.meta).not.toHaveBeenCalled();
 });
-it('reuses pending jobs after an uncertain enqueue result', async () => {
+it('does not resend pending jobs even before the worker claims them', async () => {
   m.find.mockResolvedValue({ id: 'existing', outputJson: null });
-  await enqueueProductPublish('product');
+  expect(await enqueueProductPublish('product')).toEqual({ jobId: 'existing', alreadyQueued: true });
   expect(m.create).not.toHaveBeenCalled();
-  expect(m.publish.mock.calls[0][0].deduplicationId).toBe('existing');
+  expect(m.publish).not.toHaveBeenCalled();
+});
+it('does not resend a processing job', async () => {
+  m.find.mockResolvedValue({ id: 'existing', outputJson: { phase: 'CLAIMED' }, startedAt: new Date() });
+  expect(await enqueueProductPublish('product')).toMatchObject({ alreadyQueued: true });
+  expect(m.publish).not.toHaveBeenCalled();
+});
+it('serializes two enqueue requests and dispatches only once', async () => {
+  const run = m.transaction.getMockImplementation()!;
+  let tail = Promise.resolve();
+  let pending: { id: string; outputJson: null } | null = null;
+  m.find.mockImplementation(async () => pending);
+  m.create.mockImplementation(async () => { pending = { id: 'job', outputJson: null }; return pending; });
+  m.transaction.mockImplementation(fn => {
+    const next = tail.then(() => run(fn));
+    tail = next.catch(() => undefined);
+    return next;
+  });
+  const results = await Promise.all([enqueueProductPublish('product'), enqueueProductPublish('product')]);
+  expect(results.filter(result => result.alreadyQueued)).toHaveLength(1);
+  expect(m.create).toHaveBeenCalledTimes(1);
+  expect(m.publish).toHaveBeenCalledTimes(1);
 });
 it('fails closed without signing keys', async () => {
   vi.stubEnv('QSTASH_CURRENT_SIGNING_KEY', '');

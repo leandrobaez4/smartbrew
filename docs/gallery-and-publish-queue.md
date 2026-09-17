@@ -20,11 +20,12 @@ El botón del listado usa una acción autenticada de encolado, un JobExecution p
 
 El worker `/api/queue/product-publish` exige claves y firma válidas. Usa el mismo servicio de publicación que el flujo individual, con bloqueo del producto y los controles previos de duplicados. Se preservan IDs e historial. El detalle y la vista previa individual siguen publicando directamente.
 
-- Envío a QStash incierto: el trabajo persistido puede reenviarse con la misma clave de deduplicación.
+- Producto con trabajo STARTED: no se crea otro trabajo ni se vuelve a enviar a QStash. La respuesta distingue los nuevos encolados de los que ya estaban en cola/procesando. La comprobación se realiza con bloqueo del producto, incluso ante dos clics simultáneos.
+- Envío a QStash incierto: se conserva la reserva y se informa el error. No se reenvía desde el botón normal: requiere verificar QStash y recuperar administrativamente el trabajo para no duplicar una entrega que sí pudo haberse aceptado.
 - Reentrega de trabajo completado o fallido: no repite la publicación.
 - Trabajo reclamado e interrumpido: no lo vuelve a ejecutar ciegamente; se señala revisión después de tres minutos. Verificar logs y estado real antes de conciliar. No hay recuperación automática de efectos externos ambiguos.
 - Error confirmado por Meta o resultado incierto: queda registrado en Publication y JobExecution. Un HTTP 200 del consumidor significa trabajo atendido, no publicación exitosa.
 - Ver el resultado en la columna Instagram y usar «Actualizar estado de la cola». Los errores completos están en el tooltip y registros del admin.
-- No hay un cron de recuperación para mensajes nunca aceptados por QStash; volver a encolar explícitamente conserva la identidad del trabajo.
+- No hay un cron ni botón de recuperación para mensajes nunca aceptados por QStash; deben revisarse antes de recuperarlos administrativamente.
 
 Pruebas locales con mocks: `npm test` y `node --test extensions/affiliate-link/request.test.mjs extensions/affiliate-link/gallery.test.mjs`. La prueba de producción y la instalación de extensión requieren intervención del usuario; no se ha publicado nada remotamente desde estas pruebas.

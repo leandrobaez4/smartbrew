@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation';
 import { Camera, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction } from '../actions';
 
-export default function InstagramPublishButton({ productId, isPublished }: { productId: string, isPublished: boolean }) {
+export default function InstagramPublishButton({ productId, isPublished, blocked = false, canPublish = true }: { productId: string, isPublished: boolean, blocked?: boolean, canPublish?: boolean }) {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handlePublish = async () => {
+    if (isPublished || blocked || !canPublish || isProcessing) return;
     if (!confirm('¿Seguro que querés publicar este producto en Instagram?')) return;
     
     setIsProcessing(true);
@@ -55,7 +56,7 @@ export default function InstagramPublishButton({ productId, isPublished }: { pro
       <div className="mt-4 border-t border-gray-200 dark:border-gray-800 pt-4">
         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Instagram</h3>
         {isPublished ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-1 text-sm font-medium text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-3 py-1.5 rounded-full">
               <Camera size={16} /> Publicado
             </span>
@@ -77,12 +78,13 @@ export default function InstagramPublishButton({ productId, isPublished }: { pro
         ) : (
           <button
             onClick={handlePublish}
-            disabled={isProcessing}
+            disabled={isProcessing || blocked || !canPublish}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-orange-400 rounded-md hover:opacity-90 disabled:opacity-50 shadow-sm transition-opacity"
           >
-            <Camera size={18} /> Publicar ahora en Instagram
+            <Camera size={18} /> {blocked ? 'En cola / procesando' : 'Publicar ahora en Instagram'}
           </button>
         )}
+        {!isPublished && !canPublish && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">Configurá el enlace de afiliado y la imagen antes de publicar.</p>}
       </div>
 
       {/* Loading Overlay */}

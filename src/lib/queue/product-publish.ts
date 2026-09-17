@@ -12,24 +12,25 @@ export async function enqueueProductPublish(productId: string) {
     const product = await tx.product.findUniqueOrThrow({ where: { id: productId } });
     if (!product.affiliateUrl || !product.primaryImageUrl) throw Error('El producto necesita imagen y enlace de afiliado.');
     const pending = await tx.jobExecution.findFirst({ where: { jobName: 'instagram_product_publish', entityId: productId, status: 'STARTED' } });
-    if (pending) return pending;
+    if (pending) return { job: pending, alreadyQueued: true };
     const active = await tx.publication.findFirst({ where: { draft: { productId }, platform: 'INSTAGRAM', deletedAt: null, status: { in: ['PUBLISHED', 'QUEUED', 'UPLOADING', 'PROCESSING'] } } });
     if (active) throw Error('Ya está publicado o tiene una operación pendiente de conciliación.');
-    return tx.jobExecution.create({ data: { jobName: 'instagram_product_publish', entityId: productId, entityType: 'product', status: 'STARTED' } });
+    const created = await tx.jobExecution.create({ data: { jobName: 'instagram_product_publish', entityId: productId, entityType: 'product', status: 'STARTED' } });
+    return { job: created, alreadyQueued: false };
   });
-  if (job.outputJson) {
-    if (Date.now() - job.startedAt.getTime() > 180000) throw Error('Intento interrumpido: verificá y conciliá su resultado antes de volver a publicar.');
-    return job.id; // Already claimed; never submit a second attempt.
+  if (job.alreadyQueued) {
+    if (job.job.outputJson && Date.now() - job.job.startedAt.getTime() > 180000) throw Error('Intento interrumpido: verificá y conciliá su resultado antes de volver a publicar.');
+    return { jobId: job.job.id, alreadyQueued: true };
   }
   try {
     await new Client({ token: process.env.QSTASH_TOKEN }).publishJSON({
-      url: url.href, body: { jobId: job.id }, deduplicationId: job.id, retries: 3,
+      url: url.href, body: { jobId: job.job.id }, deduplicationId: job.job.id, retries: 3,
       flowControl: { key: 'smartbrew-product-publish', parallelism: 1 },
       timeout: '90s',
       headers: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : undefined,
     });
-  } catch { throw Error('No se confirmó el envío a QStash. Podés volver a encolar: se conserva el mismo trabajo.'); }
-  return job.id;
+  } catch { throw Error('No se confirmó el envío a QStash. El trabajo quedó reservado para evitar duplicados; revisá QStash antes de recuperarlo.'); }
+  return { jobId: job.job.id, alreadyQueued: false };
 }
 
 export async function processProductPublish(jobId: string) {

@@ -8,18 +8,19 @@ import {
   X, 
   ExternalLink, 
   Camera, 
-  Trash2, 
-  Loader2, 
   AlertCircle, 
   Copy,
   Check,
   Edit
 } from 'lucide-react';
 import { ProductStatus } from '@prisma/client';
-import { ProductData } from './ProductTable';
+import type { ProductData } from './ProductTable';
+import InstagramPublishButton from './[id]/InstagramPublishButton';
+import InstagramReconciliation from './[id]/InstagramReconciliation';
+import FacebookInstagramVerification from './[id]/FacebookInstagramVerification';
+import CheckAvailabilityButton from './[id]/CheckAvailabilityButton';
+import AffiliateConfiguration from './AffiliateConfiguration';
 import { 
-  publishToInstagramAction, 
-  unpublishFromInstagramAction, 
   updateProductStatusAction 
 } from './actions';
 
@@ -32,57 +33,19 @@ interface ProductPreviewModalProps {
 export default function ProductPreviewModal({ product, fromUrl, onClose }: ProductPreviewModalProps) {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<ProductStatus | null>(product?.status || null);
-  const [isPublished, setIsPublished] = useState<boolean>(product?.isPublished || false);
   const [copied, setCopied] = useState(false);
 
   if (!product) return null;
+
+  const isPublished = product.isPublished;
 
   const handleStatusChange = async (newStatus: ProductStatus) => {
     setIsProcessing(true);
     const res = await runPublicationAction(() => updateProductStatusAction(product.id, newStatus));
     if (res.success) {
-      setCurrentStatus(newStatus);
       router.refresh();
     } else {
       alert(`Error al actualizar estado: ${res.message}`);
-    }
-    setIsProcessing(false);
-  };
-
-  const handlePublish = async () => {
-    if (!product.affiliateUrl) {
-      alert('⚠️ Este producto no tiene Link de Afiliado configurado. Configuralo antes de publicar.');
-      return;
-    }
-    if (!confirm(`¿Publicar "${product.title}" en Instagram?`)) return;
-
-    setIsProcessing(true);
-    const res = await runPublicationAction(() => publishToInstagramAction([product.id]));
-    if (res.success) {
-      setIsPublished(true);
-      alert(res.message || 'Publicación confirmada.');
-      router.refresh();
-    } else {
-      alert(`Error al publicar: ${res.message}`);
-    }
-    setIsProcessing(false);
-  };
-
-  const handleUnpublish = async () => {
-    const confirmMsg = confirm(
-      `¿Eliminar la publicación de "${product.title}" en Instagram? No es un archivado temporal. Se conservará el historial y solo se marcará eliminada cuando Meta lo confirme.`
-    );
-    if (!confirmMsg) return;
-
-    setIsProcessing(true);
-    const res = await runPublicationAction(() => unpublishFromInstagramAction([product.id]));
-    if (res.success) {
-      setIsPublished(false);
-      alert(res.message || 'Eliminación confirmada.');
-      router.refresh();
-    } else {
-      alert(`Error al despublicar: ${res.message}`);
     }
     setIsProcessing(false);
   };
@@ -101,7 +64,7 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
     ARCHIVED: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-400', label: 'Archivado' },
   };
 
-  const activeStatus = currentStatus || product.status;
+  const activeStatus = product.status;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -183,6 +146,10 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
             </div>
           </div>
 
+          {product.imageUrls.length > 0 && <div className="grid grid-cols-4 gap-2" aria-label="Galería del producto">
+            {product.imageUrls.map((image, index) => <a key={image} href={image} target="_blank" rel="noopener noreferrer"><img src={image} alt={`${product.title} · foto ${index + 1}`} loading="lazy" className="h-20 w-full rounded-xl border border-gray-200 dark:border-gray-700 object-contain" /></a>)}
+          </div>}
+
           {/* Link de Afiliado */}
           <div className="bg-gray-50 dark:bg-gray-800/50 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
@@ -208,42 +175,24 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
             )}
           </div>
 
+          <details className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <summary className="cursor-pointer text-sm font-semibold">Editar enlace de afiliado</summary>
+            <AffiliateConfiguration key={product.affiliateUrl} productId={product.id} affiliateUrl={product.affiliateUrl} />
+          </details>
+
           {/* Acciones de Estado y Despublicación */}
           <div className="space-y-4 pt-2 border-t border-gray-100 dark:border-gray-800">
-            {/* Control de Instagram */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-pink-50/50 dark:bg-pink-950/20 border border-pink-100 dark:border-pink-900/30">
-              <div>
-                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                  <Camera size={16} className="text-pink-600" />
-                  Estado en Instagram
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {isPublished 
-                    ? 'Este producto figura como PUBLICADO en tu cuenta de Instagram.' 
-                    : 'Aún no fue publicado en Instagram.'}
-                </p>
-              </div>
-
-              {isPublished ? (
-                <button
-                  onClick={handleUnpublish}
-                  disabled={isProcessing}
-                  className="inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-xl text-xs transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                  Eliminar en Instagram
-                </button>
-              ) : (
-                <button
-                  onClick={handlePublish}
-                  disabled={isProcessing || !product.affiliateUrl}
-                  className="inline-flex items-center justify-center gap-2 bg-pink-600 hover:bg-pink-700 text-white font-medium px-4 py-2 rounded-xl text-xs transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
-                  Publicar en Instagram
-                </button>
-              )}
+            <div className="p-4 rounded-xl bg-pink-50/50 dark:bg-pink-950/20 border border-pink-100 dark:border-pink-900/30">
+              <InstagramPublishButton productId={product.id} isPublished={isPublished}
+                blocked={product.instagramBlocked || product.queueStatus === 'STARTED'}
+                canPublish={Boolean(product.affiliateUrl && product.primaryImageUrl)} />
+              {product.queueStatus === 'STARTED' && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{product.queueNeedsReview ? 'Intento interrumpido: verificá el resultado antes de volver a publicar.' : 'En cola / procesando. No se enviará otra publicación.'}</p>}
+              {product.instagramPublications.map(pub => (
+                <InstagramReconciliation key={pub.id} productId={product.id} publicationId={pub.id} mediaId={pub.mediaId} />
+              ))}
             </div>
+            <FacebookInstagramVerification key={product.instagramPublications.map(pub => pub.id).join(',')} productId={product.id} publications={product.instagramPublications} />
+            <CheckAvailabilityButton productId={product.id} externalId={product.externalId || ''} />
 
             {/* Selector manual de estado del producto */}
             <div>

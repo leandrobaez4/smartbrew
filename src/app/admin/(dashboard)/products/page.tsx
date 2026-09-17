@@ -63,7 +63,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       queueStatus: jobsByProduct.get(p.id)?.status || null,
       queueError: jobsByProduct.get(p.id)?.errorMessage || null,
       queueNeedsReview: Boolean(jobsByProduct.get(p.id)?.outputJson && jobsByProduct.get(p.id)?.status === 'STARTED' && Date.now() - jobsByProduct.get(p.id)!.startedAt.getTime() > 180000),
-      isPublished
+      isPublished,
+      instagramPublications: p.drafts.flatMap(d => d.publications).filter(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED' && !pub.deletedAt).map(pub => ({ id: pub.id, mediaId: pub.externalMediaId })),
+      instagramBlocked: p.drafts.some(d => d.publications.some(pub => pub.platform === 'INSTAGRAM' && !pub.deletedAt && ['QUEUED', 'UPLOADING', 'PROCESSING'].includes(pub.status))),
+      imageUrls: p.imageUrls
     };
   });
 

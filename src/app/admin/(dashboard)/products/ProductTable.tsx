@@ -25,6 +25,9 @@ export type ProductData = {
   affiliateUrl: string | null;
   createdAt: Date;
   isPublished: boolean;
+  instagramPublications: { id: string; mediaId: string | null }[];
+  instagramBlocked: boolean;
+  imageUrls: string[];
   queueStatus?: string | null;
   queueError?: string | null;
   queueNeedsReview?: boolean;
@@ -307,11 +310,12 @@ export default function ProductTable({ products, total, page, totalPages, search
       )}
 
       {/* Product Preview & Availability Modal */}
-      <ProductPreviewModal 
-        product={previewProduct} 
+      {previewProduct && <ProductPreviewModal
+        key={previewProduct.id}
+        product={products.find(product => product.id === previewProduct.id) || null}
         fromUrl={backUrl}
         onClose={() => setPreviewProduct(null)} 
-      />
+      />}
     </div>
   );
 }
