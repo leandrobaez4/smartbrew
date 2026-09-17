@@ -11,5 +11,6 @@ export async function enqueueInstagramProductsAction(ids: string[]) {
   const alreadyQueued = outcomes.filter(outcome => outcome.status === 'fulfilled' && outcome.value.alreadyQueued).length;
   const errors = outcomes.flatMap((outcome, index) => outcome.status === 'rejected' ? [`${[...new Set(ids)][index]}: ${outcome.reason instanceof Error && !outcome.reason.name.includes('Prisma') ? outcome.reason.message : 'No se pudo encolar.'}`] : []);
   revalidatePath('/admin/products');
+  for (const id of new Set(ids)) revalidatePath(`/admin/products/${id}`);
   return { success: !errors.length, message: `${queued} producto(s) agregado(s) a la cola. ${alreadyQueued ? `${alreadyQueued} ya estaba(n) en cola o procesándose; no se reenviaron a QStash. ` : ''}Podés cerrar la pantalla. ${errors.join(' ')}` };
 }

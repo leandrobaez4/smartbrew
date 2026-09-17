@@ -29,6 +29,7 @@ test('reports each stage and includes collected photos', async () => {
   const result = await generateProduct(chrome, message => stages.push(message), deadlines);
   assert.equal(stages.length, 3);
   assert.deepEqual(result.images, ['https://http2.mlstatic.com/b.webp']);
+  assert.equal(result.product.image, 'https://http2.mlstatic.com/b.webp');
 });
 test('reports API errors without attempting gallery collection or retrying', async () => {
   const chrome = mockChrome(async () => [{ result: { ok: false, message: 'HTTP 403' } }], () => { assert.fail('should not run'); });

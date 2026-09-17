@@ -32,5 +32,5 @@ export async function generateProduct(chrome, onProgress, deadlines = { tab: 500
   } catch {
     warning = 'No se pudo leer la galería. Podés enviar el producto con la portada y agregar las fotos más adelante.';
   }
-  return { ...response, images, warning };
+  return { ...response, product: { ...response.product, image: images[0] || '' }, images, warning };
 }

@@ -41,6 +41,17 @@ test('reports 403 without exposing response or retrying', async () => {
   assert.match(result.message, /403/);
   assert.equal(calls, 1);
 });
+test('uses only a ui-pdp-image as the cover, never og:image', async () => {
+  product();
+  const image = 'https://http2.mlstatic.com/product.webp';
+  globalThis.document = { querySelector: selector => {
+    if (selector === 'h1') return { textContent: 'Reloj' };
+    assert.equal(selector, 'img.ui-pdp-image');
+    return { currentSrc: image };
+  } };
+  globalThis.fetch = async () => Response.json({ link: 'https://meli.la/test' });
+  assert.equal((await requestAffiliateLink()).product.image, image);
+});
 test('accepts /up/MLAU product URLs and submits the original URL', async () => {
   product();
   globalThis.location = new URL('https://www.mercadolibre.com.ar/balanza-barista-digital-cafe-tiny-s-temporizador-precision/up/MLAU389769541#wid=MLA1817740204&sid=search');

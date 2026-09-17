@@ -10,8 +10,7 @@ test('chooses largest srcset candidate, deduplicates photo variants, excludes un
   globalThis.document = {
     querySelector: () => ({ content: small }),
     querySelectorAll: selector => {
-      assert.ok(selector.includes('.ui-pdp-gallery'));
-      assert.notEqual(selector, 'img');
+      assert.equal(selector, 'img.ui-pdp-image');
       return [
         { src: small, naturalWidth: 100, getAttribute: key => key === 'srcset' ? `${small} 320w, ${large} 1200w` : null },
         { src: second, naturalWidth: 800, getAttribute: () => null },
@@ -23,5 +22,16 @@ test('chooses largest srcset candidate, deduplicates photo variants, excludes un
 });
 test('does not collect outside Mercado Libre', () => {
   globalThis.location = new URL('https://example.com');
+  assert.deepEqual(collectProductGallery(), []);
+});
+test('ignores og:image and unrelated gallery elements when no product images exist', () => {
+  globalThis.location = new URL('https://www.mercadolibre.com.ar/p/MLA123');
+  globalThis.document = {
+    querySelector: () => { assert.fail('must not read metadata images'); },
+    querySelectorAll: selector => {
+      assert.equal(selector, 'img.ui-pdp-image');
+      return [];
+    },
+  };
   assert.deepEqual(collectProductGallery(), []);
 });

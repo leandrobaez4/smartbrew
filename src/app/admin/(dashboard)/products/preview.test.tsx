@@ -5,6 +5,7 @@ vi.stubGlobal('React', React);
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('./actions', () => ({ publishToInstagramAction: vi.fn(), unpublishFromInstagramAction: vi.fn(), verifyInstagramPublicationAction: vi.fn(), updateProductStatusAction: vi.fn(), reconcileInstagramPublicationAction: vi.fn(), inspectFacebookInstagramAction: vi.fn() }));
 vi.mock('./affiliate-actions', () => ({ updateAffiliateUrlAction: vi.fn() }));
+vi.mock('./queue-actions', () => ({ enqueueInstagramProductsAction: vi.fn() }));
 vi.mock('./[id]/actions', () => ({ checkAvailability: vi.fn() }));
 vi.mock('@/lib/publication-client', () => ({ runPublicationAction: vi.fn() }));
 import ProductPreviewModal from './ProductPreviewModal';
@@ -24,7 +25,7 @@ it('shows published state and reconciliation on first opening, never a publish b
   expect(html).toContain('IG Activo');
   expect(html).toContain('Verificar en IG');
   expect(html).toContain('Conciliar registro de Instagram');
-  expect(html).not.toContain('Publicar ahora en Instagram');
+  expect(html).not.toContain('Encolar publicación en Instagram');
 });
 it('blocks queued products and includes edit functionality', () => {
   const html = render({ queueStatus: 'STARTED' });
@@ -37,6 +38,6 @@ it('shows a new product without stale publication or reconciliation', () => {
   const html = render({ id: 'two' });
   expect(html).not.toContain('IG Activo');
   expect(html).not.toContain('Conciliar registro');
-  expect(html).toContain('Publicar ahora en Instagram');
+  expect(html).toContain('Encolar publicación en Instagram');
   expect(html).toContain('Configurá el enlace de afiliado y la imagen');
 });

@@ -4,24 +4,28 @@ import { useState } from 'react';
 import { runPublicationAction } from '@/lib/publication-client';
 import { useRouter } from 'next/navigation';
 import { Camera, Trash2, Loader2, RefreshCw } from 'lucide-react';
-import { publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction } from '../actions';
+import { unpublishFromInstagramAction, verifyInstagramPublicationAction } from '../actions';
+import { enqueueInstagramProductsAction } from '../queue-actions';
 
 export default function InstagramPublishButton({ productId, isPublished, blocked = false, canPublish = true }: { productId: string, isPublished: boolean, blocked?: boolean, canPublish?: boolean }) {
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isEnqueuing, setIsEnqueuing] = useState(false);
 
   const handlePublish = async () => {
     if (isPublished || blocked || !canPublish || isProcessing) return;
-    if (!confirm('¿Seguro que querés publicar este producto en Instagram?')) return;
+    if (!confirm('¿Agregar este producto a la cola de publicación de Instagram?')) return;
     
     setIsProcessing(true);
-    const result = await runPublicationAction(() => publishToInstagramAction([productId]));
+    setIsEnqueuing(true);
+    const result = await runPublicationAction(() => enqueueInstagramProductsAction([productId]));
     if (!result.success) {
-      alert(`Error al publicar: ${result.message}`);
+      alert(`Error al encolar: ${result.message}`);
     } else {
-      alert(result.message || 'Publicación confirmada.');
+      alert(result.message || 'Producto encolado. Podés cerrar la pantalla.');
     }
     setIsProcessing(false);
+    setIsEnqueuing(false);
     router.refresh();
   };
 
@@ -81,10 +85,11 @@ export default function InstagramPublishButton({ productId, isPublished, blocked
             disabled={isProcessing || blocked || !canPublish}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-orange-400 rounded-md hover:opacity-90 disabled:opacity-50 shadow-sm transition-opacity"
           >
-            <Camera size={18} /> {blocked ? 'En cola / procesando' : 'Publicar ahora en Instagram'}
+            <Camera size={18} /> {blocked ? 'En cola / procesando' : 'Encolar publicación en Instagram'}
           </button>
         )}
         {!isPublished && !canPublish && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">Configurá el enlace de afiliado y la imagen antes de publicar.</p>}
+        {blocked && <button type="button" onClick={() => router.refresh()} className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">Actualizar estado de la cola</button>}
       </div>
 
       {/* Loading Overlay */}
@@ -94,7 +99,7 @@ export default function InstagramPublishButton({ productId, isPublished, blocked
             <Loader2 className="w-12 h-12 animate-spin text-pink-600 dark:text-pink-500" />
             <div>
               <p className="text-gray-900 dark:text-gray-100 font-semibold text-lg">Procesando...</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Conectando con Instagram, por favor no cierres esta ventana.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{isEnqueuing ? 'Agregando a la cola. La publicación continuará en segundo plano.' : 'Conectando con Instagram, por favor no cierres esta ventana.'}</p>
             </div>
           </div>
         </div>
