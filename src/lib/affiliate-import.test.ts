@@ -5,7 +5,10 @@ vi.mock('@upstash/qstash', () => ({ Client: class { publishJSON = m.publish; } }
 import { parseAffiliateImport } from './affiliate-import-input';
 import { processAffiliateImport, saveOrQueueAffiliate } from './affiliate-import';
 const data = { url: 'https://www.mercadolibre.com.ar/reloj/p/MLA123#tracking=1', title: 'Reloj', affiliateUrl: 'https://meli.la/test', image: '' };
-beforeEach(() => { vi.resetAllMocks(); });
+beforeEach(() => {
+  vi.resetAllMocks();
+  m.transaction.mockImplementation(fn => fn({ $queryRaw: vi.fn(), product: { findUniqueOrThrow: m.find, updateMany: m.update } }));
+});
 afterEach(() => vi.unstubAllEnvs());
 function queueConfig() {
   vi.stubEnv('QSTASH_TOKEN', 'test'); vi.stubEnv('QSTASH_CURRENT_SIGNING_KEY', 'test');
@@ -40,7 +43,7 @@ it('rejects unsafe affiliate links and images', () => {
 it('updates only the affiliate link with a compare-and-swap guard', async () => {
   m.find.mockResolvedValue({ id: 'p', affiliateUrl: null }); m.update.mockResolvedValue({ count: 1 });
   expect(await saveOrQueueAffiliate(data, null)).toMatchObject({ productId: 'p' });
-  expect(m.update.mock.calls[0][0].data).toEqual({ affiliateUrl: data.affiliateUrl });
+  expect(m.update.mock.calls[0][0].data).toEqual({ affiliateUrl: data.affiliateUrl, imageUrls: [] });
   expect(m.publish).not.toHaveBeenCalled();
 });
 it('rejects concurrent link changes without queuing or overwriting', async () => {
@@ -48,13 +51,14 @@ it('rejects concurrent link changes without queuing or overwriting', async () =>
   await expect(saveOrQueueAffiliate(data, null)).rejects.toThrow('confirmación');
   expect(m.publish).not.toHaveBeenCalled();
 });
-it('does nothing for an already saved link', async () => {
+it('can add gallery photos even for an already saved link', async () => {
   m.find.mockResolvedValue({ id: 'p', affiliateUrl: data.affiliateUrl });
+  m.update.mockResolvedValue({ count: 1 });
   await saveOrQueueAffiliate(data, null);
-  expect(m.update).not.toHaveBeenCalled();
+  expect(m.update.mock.calls[0][0].data.affiliateUrl).toBe(data.affiliateUrl);
 });
 function worker(status = 'STARTED', count = 1) {
-  m.transaction.mockImplementation(fn => fn({ $queryRaw: vi.fn(), jobExecution: { findUnique: vi.fn().mockResolvedValue({ jobName: 'affiliate_import', status, inputJson: data }), update: m.finish }, product: { upsert: m.upsert, updateMany: m.update } }));
+  m.transaction.mockImplementation(fn => fn({ $queryRaw: vi.fn(), jobExecution: { findUnique: vi.fn().mockResolvedValue({ jobName: 'affiliate_import', status, inputJson: data }), update: m.finish }, product: { upsert: m.upsert, updateMany: m.update, findUniqueOrThrow: vi.fn().mockResolvedValue({ imageUrls: [] }) } }));
   m.upsert.mockResolvedValue({ id: 'p' }); m.update.mockResolvedValue({ count });
 }
 it('creates a candidate without any publishing and completes the job atomically', async () => {

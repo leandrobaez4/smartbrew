@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ProductStatus } from '@prisma/client';
 import { Camera, Trash2, CheckCircle2, Loader2, Eye, ExternalLink } from 'lucide-react';
-import { publishToInstagramAction, unpublishFromInstagramAction } from './actions';
+import { unpublishFromInstagramAction } from './actions';
+import { enqueueInstagramProductsAction } from './queue-actions';
 import ProductPreviewModal from './ProductPreviewModal';
 import type { ProductSort, SortDirection } from '@/lib/product-list';
 import { formatProductCreation, paginationPages } from '@/lib/product-table-display';
@@ -24,6 +25,9 @@ export type ProductData = {
   affiliateUrl: string | null;
   createdAt: Date;
   isPublished: boolean;
+  queueStatus?: string | null;
+  queueError?: string | null;
+  queueNeedsReview?: boolean;
 };
 
 export default function ProductTable({ products, total, page, totalPages, search, statusFilter, sort, direction }: {
@@ -87,10 +91,10 @@ export default function ProductTable({ products, total, page, totalPages, search
 
   const handlePublish = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`¿Publicar ${selectedIds.size} productos seleccionados en Instagram?`)) return;
+    if (!confirm(`¿Encolar ${selectedIds.size} productos para publicar en Instagram? Se procesarán en segundo plano.`)) return;
     
     setIsProcessing(true);
-    const result = await runPublicationAction(() => publishToInstagramAction(Array.from(selectedIds)));
+    const result = await runPublicationAction(() => enqueueInstagramProductsAction(Array.from(selectedIds)));
     if (!result.success) {
       alert(`Error al publicar: ${result.message}`);
     } else {
@@ -178,6 +182,12 @@ export default function ProductTable({ products, total, page, totalPages, search
                       <span className="inline-flex items-center gap-1 text-sm font-medium text-pink-600 dark:text-pink-400">
                         <Camera size={16} /> Publicado
                       </span>
+                    ) : product.queueNeedsReview ? (
+                      <span className="text-xs text-amber-600">Revisar intento interrumpido</span>
+                    ) : product.queueStatus === 'STARTED' ? (
+                      <span className="text-xs text-blue-600">En cola / procesando</span>
+                    ) : product.queueStatus === 'FAILED' ? (
+                      <span className="text-xs text-red-600" title={product.queueError || undefined}>Falló · revisar registro</span>
                     ) : (
                       <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                     )}
@@ -231,6 +241,7 @@ export default function ProductTable({ products, total, page, totalPages, search
       </div>
 
       <div className="flex flex-wrap justify-between items-center gap-3 mt-4 mb-24">
+        <button type="button" onClick={() => router.refresh()} className="cursor-pointer rounded border px-3 py-2 text-sm">Actualizar estado de la cola</button>
         <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
           Mostrando {products.length} de {total} productos · Página {page} de {totalPages}
         </div>
@@ -276,7 +287,7 @@ export default function ProductTable({ products, total, page, totalPages, search
               disabled={isProcessing}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-orange-400 rounded-md hover:opacity-90 disabled:opacity-50 shadow-md"
             >
-              <Camera size={16} /> Publicar en Instagram
+              <Camera size={16} /> Encolar en Instagram
             </button>
           </div>
         </div>
@@ -289,7 +300,7 @@ export default function ProductTable({ products, total, page, totalPages, search
             <Loader2 className="w-12 h-12 animate-spin text-pink-600 dark:text-pink-500" />
             <div>
               <p className="text-gray-900 dark:text-gray-100 font-semibold text-lg">Procesando...</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Conectando con Instagram, por favor no cierres esta ventana.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Enviando la solicitud. Para publicaciones, la cola continuará trabajando cuando termine este envío.</p>
             </div>
           </div>
         </div>

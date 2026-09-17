@@ -40,6 +40,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   // Mapeamos para determinar si está publicado en Instagram
   const positions = new Map(orderedIds.map((p, index) => [p.id, index]));
+  const jobs = await prisma.jobExecution.findMany({ where: { jobName: 'instagram_product_publish', entityId: { in: orderedIds.map(p => p.id) } }, orderBy: { startedAt: 'desc' }, distinct: ['entityId'] });
+  const jobsByProduct = new Map(jobs.map(job => [job.entityId, job]));
   const products = productsRaw.sort((a, b) => positions.get(a.id)! - positions.get(b.id)!).map(p => {
     // Revisar si tiene alguna publicacion con status PUBLISHED en algun draft
     const isPublished = p.drafts.some(d => 
@@ -58,6 +60,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       originalPermalink: p.originalPermalink,
       affiliateUrl: p.affiliateUrl,
       createdAt: p.createdAt,
+      queueStatus: jobsByProduct.get(p.id)?.status || null,
+      queueError: jobsByProduct.get(p.id)?.errorMessage || null,
+      queueNeedsReview: Boolean(jobsByProduct.get(p.id)?.outputJson && jobsByProduct.get(p.id)?.status === 'STARTED' && Date.now() - jobsByProduct.get(p.id)!.startedAt.getTime() > 180000),
       isPublished
     };
   });

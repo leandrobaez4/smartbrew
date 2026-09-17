@@ -1,4 +1,5 @@
 import { requestAffiliateLink } from './request.mjs';
+import { collectProductGallery } from './gallery.mjs';
 
 const button = document.querySelector('#generate');
 const status = document.querySelector('#status');
@@ -29,7 +30,9 @@ button.addEventListener('click', async () => {
     if (response?.ok) {
       result.value = response.link;
       if (response.product?.title) {
-        importData = { ...response.product, affiliateUrl: response.link };
+        const [gallery] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: collectProductGallery });
+        importData = { ...response.product, affiliateUrl: response.link, images: JSON.stringify(gallery?.result || []) };
+        status.textContent += ` Fotos detectadas: ${gallery?.result?.length || 0}.`;
         send.disabled = false;
       }
     }

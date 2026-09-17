@@ -2,15 +2,19 @@ import { createHash } from 'node:crypto';
 import { Client } from '@upstash/qstash';
 import { portalDb as db } from './portal';
 import { parseAffiliateImport } from './affiliate-import-input';
+import { mergeProductImages } from './product-gallery';
 
 export async function saveOrQueueAffiliate(raw: unknown, expectedLink: string | null) {
   const data = parseAffiliateImport(raw);
   const existing = await db.product.findUnique({ where: { marketplace_externalId: { marketplace: 'MERCADO_LIBRE', externalId: data.externalId } } });
   if (existing) {
-    if (existing.affiliateUrl === data.affiliateUrl) return { message: 'El producto ya tiene este enlace.', productId: existing.id };
-    const update = await db.product.updateMany({ where: { id: existing.id, ...(expectedLink === null ? { OR: [{ affiliateUrl: null }, { affiliateUrl: '' }] } : { affiliateUrl: expectedLink }) }, data: { affiliateUrl: data.affiliateUrl } });
-    if (!update.count) throw Error('El enlace cambió o requiere confirmación. Recargá la pantalla antes de reemplazarlo.');
-    return { message: 'Enlace guardado.', productId: existing.id };
+    await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${existing.id} FOR UPDATE`;
+      const current = await tx.product.findUniqueOrThrow({ where: { id: existing.id } });
+      const update = await tx.product.updateMany({ where: { id: existing.id, OR: [{ affiliateUrl: data.affiliateUrl }, ...(expectedLink === null ? [{ affiliateUrl: null }, { affiliateUrl: '' }] : [{ affiliateUrl: expectedLink }])] }, data: { affiliateUrl: data.affiliateUrl, imageUrls: mergeProductImages(current.imageUrls, data.images) } });
+      if (!update.count) throw Error('El enlace cambió o requiere confirmación. Recargá la pantalla antes de reemplazarlo.');
+    });
+    return { message: 'Enlace y galería guardados.', productId: existing.id };
   }
   if (!process.env.QSTASH_TOKEN || !process.env.QSTASH_CURRENT_SIGNING_KEY || !process.env.QSTASH_NEXT_SIGNING_KEY || !process.env.APP_URL) throw Error('Falta configurar QStash y APP_URL en el servidor.');
   const destination = new URL('/api/queue/affiliate-import', process.env.APP_URL);
@@ -38,10 +42,12 @@ export async function processAffiliateImport(jobId: string) {
     const product = await tx.product.upsert({
       where: { marketplace_externalId: { marketplace: 'MERCADO_LIBRE', externalId: data.externalId } },
       update: {},
-      create: { marketplace: 'MERCADO_LIBRE', externalId: data.externalId, title: data.title, originalPermalink: data.url, primaryImageUrl: data.image || null, affiliateUrl: data.affiliateUrl, status: 'CANDIDATE', selectionReasons: ['Importado desde extensión; precio y disponibilidad pendientes de verificar.'] },
+      create: { marketplace: 'MERCADO_LIBRE', externalId: data.externalId, title: data.title, originalPermalink: data.url, primaryImageUrl: data.image || data.images[0] || null, imageUrls: data.images, affiliateUrl: data.affiliateUrl, status: 'CANDIDATE', selectionReasons: ['Importado desde extensión; precio y disponibilidad pendientes de verificar.'] },
     });
     // Atomic guard against another import or manual link edit. Never overwrite silently.
-    const saved = await tx.product.updateMany({ where: { id: product.id, OR: [{ affiliateUrl: null }, { affiliateUrl: '' }, { affiliateUrl: data.affiliateUrl }] }, data: { affiliateUrl: data.affiliateUrl } });
+    await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${product.id} FOR UPDATE`;
+    const current = await tx.product.findUniqueOrThrow({ where: { id: product.id } });
+    const saved = await tx.product.updateMany({ where: { id: product.id, OR: [{ affiliateUrl: null }, { affiliateUrl: '' }, { affiliateUrl: data.affiliateUrl }] }, data: { affiliateUrl: data.affiliateUrl, imageUrls: mergeProductImages(current.imageUrls, data.images) } });
     await tx.jobExecution.update({ where: { id: jobId }, data: {
       status: saved.count ? 'SUCCEEDED' : 'FAILED', finishedAt: new Date(),
       errorMessage: saved.count ? null : 'El producto ya tiene otro enlace. Confirmá el reemplazo desde el admin.',

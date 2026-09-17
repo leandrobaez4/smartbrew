@@ -76,6 +76,7 @@ model Product {
   originalPermalink    String
   affiliateUrl         String?
   primaryImageUrl      String?
+  imageUrls            String[] @default([])
   attributesJson       Json?
   sellerId             String?
   sellerReputation     String?

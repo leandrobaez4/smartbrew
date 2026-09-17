@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('@/lib/instagram-publish', async () => await import('../../../../lib/instagram-publish'));
 const m = vi.hoisted(() => ({ auth: vi.fn(), transaction: vi.fn(), lock: vi.fn(), product: vi.fn(), active: vi.fn(), draft: vi.fn(), create: vi.fn(), update: vi.fn(), list: vi.fn(), meta: vi.fn(), audit: vi.fn(), wait: vi.fn() }));
 vi.mock('@prisma/client', () => ({ PrismaClient: class {
   $transaction = m.transaction;

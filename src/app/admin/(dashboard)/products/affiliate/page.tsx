@@ -17,7 +17,8 @@ export default async function AffiliateImportPage({ searchParams }: { searchPara
     <p>{data.title} · {data.externalId}</p>
     <p className="break-all">Producto: {data.url}</p>
     <p>Enlace de afiliado: {data.affiliateUrl}</p>
-    <p>{product ? 'El producto ya existe. Solo se modificará el enlace, conservando los demás datos.' : 'Se encolará en QStash y se creará como candidato con título, imagen y enlace. Precio y disponibilidad quedan pendientes de verificar.'}</p>
+    <p>{data.images.length} fotos recibidas (máximo 20).</p>
+    <p>{product ? 'El producto ya existe. Se actualizará el enlace y se agregarán fotos a su galería, conservando su portada y los demás datos.' : 'Se encolará en QStash y se creará como candidato con título, galería y enlace. Precio y disponibilidad quedan pendientes de verificar.'}</p>
     <p>No se publicará en Instagram.</p>
     {job && <p>Último estado del trabajo: {job.status === 'SUCCEEDED' ? 'Completado' : job.status === 'FAILED' ? 'Falló / requiere revisión' : 'Pendiente de procesamiento'}{job.errorMessage ? ` — ${job.errorMessage}` : ''}</p>}
     <ImportForm data={data} existingLink={product?.affiliateUrl || null} />
