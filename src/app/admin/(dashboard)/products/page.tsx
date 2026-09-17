@@ -10,11 +10,9 @@ const prisma = new PrismaClient();
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ page?: string, search?: string, status?: string, sort?: string, direction?: string }> }) {
   const sp = await searchParams;
   const requestedPage = Number(sp.page || '1');
-  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const sort = parseProductSort(sp.sort);
   const direction = parseSortDirection(sp.direction);
   const limit = 20;
-  const skip = (page - 1) * limit;
 
   const where: any = {};
   if (sp.search) {
@@ -24,9 +22,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     where.status = sp.status as ProductStatus;
   }
 
+  const total = await prisma.product.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.min(totalPages, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+  const skip = (page - 1) * limit;
   const orderedIds = await prisma.$queryRaw<{ id: string }[]>(productListQuery(sp.search || '', where.status || '', sort, direction, skip, limit));
-  const [productsRaw, total] = await Promise.all([
-    prisma.product.findMany({
+  const productsRaw = await prisma.product.findMany({
       where: { id: { in: orderedIds.map(p => p.id) } },
       include: {
         drafts: {
@@ -35,11 +36,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           }
         }
       }
-    }),
-    prisma.product.count({ where })
-  ]);
-  
-  const totalPages = Math.ceil(total / limit);
+    });
 
   // Mapeamos para determinar si está publicado en Instagram
   const positions = new Map(orderedIds.map((p, index) => [p.id, index]));

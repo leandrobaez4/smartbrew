@@ -9,6 +9,7 @@ import { Camera, Trash2, CheckCircle2, Loader2, Eye, ExternalLink } from 'lucide
 import { publishToInstagramAction, unpublishFromInstagramAction } from './actions';
 import ProductPreviewModal from './ProductPreviewModal';
 import type { ProductSort, SortDirection } from '@/lib/product-list';
+import { formatProductCreation, paginationPages } from '@/lib/product-table-display';
 
 export type ProductData = {
   id: string;
@@ -39,6 +40,7 @@ export default function ProductTable({ products, total, page, totalPages, search
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewProduct, setPreviewProduct] = useState<ProductData | null>(null);
+  const visiblePages = paginationPages(page, totalPages);
 
   // Armamos la URL actual con todos los filtros para poder volver exactamente a este estado
   const currentParams = new URLSearchParams();
@@ -55,12 +57,12 @@ export default function ProductTable({ products, total, page, totalPages, search
     return `?${params}`;
   };
   const sortHeader = (column: ProductSort, label: string) => (
-    <th scope="col" aria-sort={sort === column ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+    <th scope="col" aria-sort={sort === column ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'} className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
       <button type="button" className="inline-flex items-center gap-2 cursor-pointer hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500" onClick={() => {
         const params = new URLSearchParams(currentParams);
         params.delete('page');
         params.set('sort', column);
-        params.set('direction', sort === column && direction === 'asc' ? 'desc' : 'asc');
+        params.set('direction', sort === column ? (direction === 'asc' ? 'desc' : 'asc') : (column === 'createdAt' ? 'desc' : 'asc'));
         router.push(`/admin/products?${params}`);
       }}>
         {label}<span aria-hidden="true">{sort === column ? (direction === 'asc' ? '↑' : '↓') : '↕'}</span>
@@ -113,12 +115,12 @@ export default function ProductTable({ products, total, page, totalPages, search
 
   return (
     <div className="relative">
-      <div className="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 mb-20">
+      <div className="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-gray-950/50">
               <tr>
-                <th className="px-6 py-3 text-left">
+                <th className="px-3 py-2 text-left">
                   <input 
                     type="checkbox" 
                     checked={selectedIds.size > 0 && selectedIds.size === products.length}
@@ -130,13 +132,14 @@ export default function ProductTable({ products, total, page, totalPages, search
                 {sortHeader('status', 'Estado')}
                 {sortHeader('instagram', 'Instagram')}
                 {sortHeader('affiliate', 'Link de afiliado')}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
+                {sortHeader('createdAt', 'Creado')}
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
               {products.map(product => (
                 <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-6 py-4">
+                  <td className="px-3 py-2">
                     <input 
                       type="checkbox" 
                       checked={selectedIds.has(product.id)}
@@ -144,24 +147,24 @@ export default function ProductTable({ products, total, page, totalPages, search
                       className="rounded border-gray-300 dark:border-gray-700"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <div 
                       className="flex items-center cursor-pointer group"
                       onClick={() => setPreviewProduct(product)}
                       title="Click para ver vista previa y disponibilidad"
                     >
                       {product.primaryImageUrl && (
-                        <img src={product.primaryImageUrl} alt="" className="h-10 w-10 rounded-lg mr-3 object-cover border border-gray-200 dark:border-gray-700 group-hover:opacity-80 transition-opacity" />
+                        <img src={product.primaryImageUrl} alt="" className="h-8 w-8 rounded-md mr-2 object-cover border border-gray-200 dark:border-gray-700 group-hover:opacity-80 transition-opacity" />
                       )}
                       <div>
                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-xs group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={product.title}>
                           {product.title}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{product.externalId} ({product.marketplace})</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{product.externalId} ({product.marketplace})</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       product.status === 'ACTIVE' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' :
                       product.status === 'CANDIDATE' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' :
@@ -170,7 +173,7 @@ export default function ProductTable({ products, total, page, totalPages, search
                       {product.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     {product.isPublished ? (
                       <span className="inline-flex items-center gap-1 text-sm font-medium text-pink-600 dark:text-pink-400">
                         <Camera size={16} /> Publicado
@@ -179,12 +182,15 @@ export default function ProductTable({ products, total, page, totalPages, search
                       <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm">
                     {product.affiliateUrl?.trim() ? (
                       <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400"><CheckCircle2 size={16} /> Sí</span>
                     ) : <span className="text-gray-500 dark:text-gray-400">No</span>}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                    <time dateTime={new Date(product.createdAt).toISOString()}>{formatProductCreation(product.createdAt)}</time>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setPreviewProduct(product)}
@@ -216,7 +222,7 @@ export default function ProductTable({ products, total, page, totalPages, search
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No se encontraron productos.</td>
+                  <td colSpan={7} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">No se encontraron productos.</td>
                 </tr>
               )}
             </tbody>
@@ -224,22 +230,31 @@ export default function ProductTable({ products, total, page, totalPages, search
         </div>
       </div>
 
-      <div className="flex justify-between items-center mt-6">
+      <div className="flex flex-wrap justify-between items-center gap-3 mt-4 mb-24">
         <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-          Mostrando {products.length} de {total} productos
+          Mostrando {products.length} de {total} productos · Página {page} de {totalPages}
         </div>
-        <div className="flex gap-2">
+        <nav aria-label="Paginación de productos" className="flex flex-wrap items-center gap-1 text-sm">
           {page > 1 && (
             <Link href={pageUrl(page - 1)} className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               Anterior
             </Link>
           )}
+          {visiblePages.map((number, index) => (
+            <span key={number} className="inline-flex items-center gap-1">
+              {index > 0 && number - visiblePages[index - 1] > 1 && <span className="px-2 text-gray-500" aria-hidden="true">…</span>}
+              <Link href={pageUrl(number)} aria-label={`Página ${number}`} aria-current={number === page ? 'page' : undefined}
+                className={`min-w-9 rounded-md border px-3 py-2 text-center ${number === page ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'}`}>
+                {number}
+              </Link>
+            </span>
+          ))}
           {page < totalPages && (
             <Link href={pageUrl(page + 1)} className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               Siguiente
             </Link>
           )}
-        </div>
+        </nav>
       </div>
 
       {/* Sticky Action Bar */}

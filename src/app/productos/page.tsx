@@ -51,7 +51,6 @@ export default async function ProductosPage() {
               )}
               <div className="product-body">
                 <h2>{product.title}</h2>
-                <p className="product-price">${product.price?.toString()} {product.currencyId}</p>
                 <a href={product.affiliateUrl!} target="_blank" rel="noopener noreferrer sponsored" className="product-link">
                   Ver en Mercado Libre <ArrowUpRight aria-hidden="true" size={18} />
                 </a>
