@@ -4,9 +4,10 @@ import { mergeProductImages } from './product-gallery';
 export function mlIdentity(raw: string) {
   const url = new URL(raw);
   if (url.protocol !== 'https:' || !['www.mercadolibre.com.ar', 'articulo.mercadolibre.com.ar'].includes(url.hostname) || url.port || url.username || url.password) throw Error('URL de producto no permitida.');
-  const id = url.pathname.match(/(?:\/p\/|\/)(MLA-?\d+)(?:[-/]|$)/i)?.[1]?.replace('-', '').toUpperCase();
+  const id = (url.pathname.match(/\/up\/(MLAU\d+)(?:\/|$)/i)?.[1] ||
+    url.pathname.match(/\/((?:MLA)-?\d+)(?:[-/]|$)/i)?.[1])?.replace('-', '').toUpperCase();
   if (!id) throw Error('No se encontró el ID del producto.');
-  // Preserve catalog identity, matching existing URL-based imports; don't switch to wid.
+  // Preserve path identity (MLA or MLAU); tracking/wid must not change the import key.
   url.hash = ''; url.search = '';
   return { externalId: id, url: url.href };
 }

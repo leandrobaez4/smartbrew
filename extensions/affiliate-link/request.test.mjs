@@ -41,6 +41,25 @@ test('reports 403 without exposing response or retrying', async () => {
   assert.match(result.message, /403/);
   assert.equal(calls, 1);
 });
+test('accepts /up/MLAU product URLs and submits the original URL', async () => {
+  product();
+  globalThis.location = new URL('https://www.mercadolibre.com.ar/balanza-barista-digital-cafe-tiny-s-temporizador-precision/up/MLAU389769541#wid=MLA1817740204&sid=search');
+  let calls = 0;
+  globalThis.fetch = async (_, options) => {
+    calls++;
+    assert.equal(JSON.parse(options.body).url, location.href);
+    return Response.json({ link: 'https://meli.la/test' });
+  };
+  assert.equal((await requestAffiliateLink()).ok, true);
+  assert.equal(calls, 1);
+});
+test('rejects malformed product IDs without sending a request', async () => {
+  globalThis.fetch = () => { assert.fail('must not request'); };
+  for (const path of ['/up/MLAU', '/up/MLAU123garbage', '/p/MLA123garbage', '/search#wid=MLA123']) {
+    globalThis.location = new URL(`https://www.mercadolibre.com.ar${path}`);
+    assert.equal((await requestAffiliateLink()).ok, false);
+  }
+});
 test('rejects unexpected or ambiguous responses', async () => {
   product();
   for (const data of [{ link: 'https://evil.test/link' }, { a: 'https://meli.la/a', b: 'https://meli.la/b' }, { link: 'https://meli.la/a?token=secret' }]) {

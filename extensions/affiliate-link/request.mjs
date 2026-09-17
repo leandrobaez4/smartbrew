@@ -2,7 +2,7 @@
 // No cookie/token extraction, page-world code, storage, or remote executable code.
 export async function requestAffiliateLink() {
   if (location.origin !== 'https://www.mercadolibre.com.ar' ||
-      !(/\/p\/MLA\d+(?:\/|$)/.test(location.pathname) || /\/MLA-?\d+/.test(location.pathname))) {
+      !(/\/up\/MLAU\d+(?:\/|$)/i.test(location.pathname) || /\/MLA-?\d+(?:[-/]|$)/i.test(location.pathname))) {
     return { ok: false, message: 'Abrí la página de un producto en www.mercadolibre.com.ar y volvé a probar.' };
   }
   // Shared by popup invocations in this tab, preventing concurrent requests.

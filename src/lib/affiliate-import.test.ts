@@ -33,6 +33,14 @@ it('requires signing keys before enqueueing new imports', async () => {
 it('normalizes product identity without taking tracking IDs as identity', () => {
   expect(parseAffiliateImport(data)).toMatchObject({ externalId: 'MLA123', url: 'https://www.mercadolibre.com.ar/reloj/p/MLA123' });
 });
+it('imports MLAU URLs with a stable identity independent of wid', () => {
+  expect(parseAffiliateImport({ ...data, url: 'https://www.mercadolibre.com.ar/balanza-barista-digital-cafe-tiny-s-temporizador-precision/up/MLAU389769541#wid=MLA1817740204&sid=search' })).toMatchObject({
+    externalId: 'MLAU389769541', url: 'https://www.mercadolibre.com.ar/balanza-barista-digital-cafe-tiny-s-temporizador-precision/up/MLAU389769541',
+  });
+});
+it.each(['/up/MLAU', '/up/MLAU123garbage', '/p/MLA123garbage'])('rejects malformed path %s', path => {
+  expect(() => parseAffiliateImport({ ...data, url: `https://www.mercadolibre.com.ar${path}` })).toThrow();
+});
 it.each(['http://www.mercadolibre.com.ar/p/MLA123', 'https://evil.test/p/MLA123', 'https://www.mercadolibre.com.ar/'])('rejects unsafe product URL %s', url => {
   expect(() => parseAffiliateImport({ ...data, url })).toThrow();
 });
