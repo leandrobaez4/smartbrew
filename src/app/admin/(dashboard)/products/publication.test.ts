@@ -31,6 +31,17 @@ beforeEach(() => {
   m.list.mockResolvedValue([{ id: 'publication', externalMediaId: '222' }]);
 });
 afterEach(() => vi.unstubAllEnvs());
+it('includes the comment-to-DM invitation and affiliate link in product captions', async () => {
+  expect((await publishToInstagramAction(['product'])).success).toBe(true);
+  const caption = m.meta.mock.calls[0][2].body.get('caption');
+  expect(caption).toBe('Product\n\n💬 Comentá "Info", "Precio" o "Quiero" y te enviamos el enlace del producto por mensaje privado.\n\nLink: https://example.org/product');
+});
+it('does not duplicate an existing invitation or affiliate link', async () => {
+  const caption = 'Product\n\n💬 Comentá "Info", "Precio" o "Quiero" y te enviamos el enlace del producto por mensaje privado.\n\nLink: https://example.org/product';
+  m.draft.mockResolvedValue({ id: 'draft', caption });
+  expect((await publishToInstagramAction(['product'])).success).toBe(true);
+  expect(m.meta.mock.calls[0][2].body.get('caption')).toBe(caption);
+});
 function setupInspection() {
   vi.stubEnv('INSTAGRAM_DELETE_FACEBOOK_ACCESS_TOKEN', 'facebook-secret');
   vi.stubEnv('INSTAGRAM_DELETE_FACEBOOK_ACCOUNT_ID', '123');

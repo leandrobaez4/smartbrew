@@ -50,6 +50,8 @@ async function publishOne(productId: string) {
       priceSnapshot: product.price, currencySnapshot: product.currencyId,
     } });
     let caption = draft.caption || `Recomendación: ${product.title}`;
+    const commentPrompt = '💬 Comentá "Info", "Precio" o "Quiero" y te enviamos el enlace del producto por mensaje privado.';
+    if (!caption.includes(commentPrompt)) caption += `\n\n${commentPrompt}`;
     if (!caption.includes(product.affiliateUrl)) caption += `\n\nLink: ${product.affiliateUrl}`;
     const publication = await tx.publication.create({ data: { contentDraftId: draft.id, platform: 'INSTAGRAM', status: 'UPLOADING', attemptCount: 1 } });
     return { id: publication.id, image: product.primaryImageUrl, caption };
