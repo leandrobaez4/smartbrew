@@ -1,6 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { notFound } from 'next/navigation';
 import AffiliateConfiguration from '../AffiliateConfiguration';
+import ProductPublicLink from '../ProductPublicLink';
+import ProductAdForm from '../ProductAdForm';
+import { safeAffiliateUrl } from '@/lib/product-url';
 import CheckAvailabilityButton from './CheckAvailabilityButton';
 import InstagramPublishButton from './InstagramPublishButton';
 import BackButton from './BackButton';
@@ -72,6 +75,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       <FacebookInstagramVerification productId={product.id} publications={product.drafts.flatMap(d => d.publications).filter(p => p.platform === 'INSTAGRAM' && p.status === 'PUBLISHED' && !p.deletedAt).map(p => ({ id: p.id, mediaId: p.externalMediaId }))} />
       <AffiliateConfiguration key={product.affiliateUrl} productId={product.id} affiliateUrl={product.affiliateUrl} />
+      <ProductPublicLink productId={product.id} available={product.status === 'ACTIVE' && Boolean(safeAffiliateUrl(product.affiliateUrl))} />
+      <ProductAdForm productId={product.id} />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { productPath, safeAffiliateUrl } from "@/lib/product-url";
 
 export const dynamic = "force-dynamic";
 
@@ -44,16 +45,16 @@ export default async function ProductosPage() {
         </p>
 
         <div className="product-grid">
-          {products.map((product) => (
+          {products.filter(product => safeAffiliateUrl(product.affiliateUrl)).map((product) => (
             <article key={product.id} className="product-card">
               {product.primaryImageUrl && (
-                <img src={product.primaryImageUrl} alt={product.title} className="product-image" />
+                <Link href={productPath(product.id)}><img src={product.primaryImageUrl} alt={product.title} className="product-image" /></Link>
               )}
               <div className="product-body">
-                <h2>{product.title}</h2>
-                <a href={product.affiliateUrl!} target="_blank" rel="noopener noreferrer sponsored" className="product-link">
-                  Ver en Mercado Libre <ArrowUpRight aria-hidden="true" size={18} />
-                </a>
+                <h2><Link href={productPath(product.id)}>{product.title}</Link></h2>
+                <Link href={productPath(product.id)} className="product-link">
+                  Ver producto <ArrowUpRight aria-hidden="true" size={18} />
+                </Link>
               </div>
             </article>
           ))}

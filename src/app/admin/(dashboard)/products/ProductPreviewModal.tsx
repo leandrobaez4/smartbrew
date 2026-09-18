@@ -20,6 +20,9 @@ import InstagramReconciliation from './[id]/InstagramReconciliation';
 import FacebookInstagramVerification from './[id]/FacebookInstagramVerification';
 import CheckAvailabilityButton from './[id]/CheckAvailabilityButton';
 import AffiliateConfiguration from './AffiliateConfiguration';
+import ProductPublicLink from './ProductPublicLink';
+import ProductAdForm from './ProductAdForm';
+import { safeAffiliateUrl } from '@/lib/product-url';
 import { 
   updateProductStatusAction 
 } from './actions';
@@ -150,6 +153,8 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
             {product.imageUrls.map((image, index) => <a key={image} href={image} target="_blank" rel="noopener noreferrer"><img src={image} alt={`${product.title} · foto ${index + 1}`} loading="lazy" className="h-20 w-full rounded-xl border border-gray-200 dark:border-gray-700 object-contain" /></a>)}
           </div>}
 
+          <ProductPublicLink productId={product.id} available={product.status === 'ACTIVE' && Boolean(safeAffiliateUrl(product.affiliateUrl))} />
+          <ProductAdForm productId={product.id} />
           {/* Link de Afiliado */}
           <div className="bg-gray-50 dark:bg-gray-800/50 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
