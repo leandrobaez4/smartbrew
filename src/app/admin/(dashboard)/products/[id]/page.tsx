@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import AffiliateConfiguration from '../AffiliateConfiguration';
 import ProductPublicLink from '../ProductPublicLink';
 import ProductAdForm from '../ProductAdForm';
+import ProductImageEditor from '../ProductImageEditor';
 import { safeAffiliateUrl } from '@/lib/product-url';
 import CheckAvailabilityButton from './CheckAvailabilityButton';
 import InstagramPublishButton from './InstagramPublishButton';
@@ -47,10 +48,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div>
-          <img src={product.primaryImageUrl || ''} alt={product.title} className="w-full rounded-md object-cover border border-gray-200 dark:border-gray-700" />
-          {product.imageUrls.length > 0 && <div className="mt-3 grid grid-cols-3 gap-2" aria-label="Galería del producto">
-            {product.imageUrls.map((image, index) => <a key={image} href={image} target="_blank" rel="noopener noreferrer"><img src={image} alt={`${product.title} · foto ${index + 1}`} loading="lazy" className="h-24 w-full rounded border object-contain" /></a>)}
-          </div>}
+          <ProductImageEditor productId={product.id} title={product.title} primaryImageUrl={product.primaryImageUrl} imageUrls={product.imageUrls} />
         </div>
         <div className="space-y-4">
           <div>

@@ -5,6 +5,7 @@ vi.stubGlobal('React', React);
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('./actions', () => ({ publishToInstagramAction: vi.fn(), unpublishFromInstagramAction: vi.fn(), verifyInstagramPublicationAction: vi.fn(), updateProductStatusAction: vi.fn(), reconcileInstagramPublicationAction: vi.fn(), inspectFacebookInstagramAction: vi.fn() }));
 vi.mock('./affiliate-actions', () => ({ updateAffiliateUrlAction: vi.fn() }));
+vi.mock('./image-actions', () => ({ removeProductImageAction: vi.fn() }));
 vi.mock('./queue-actions', () => ({ enqueueInstagramProductsAction: vi.fn() }));
 vi.mock('./ad-actions', () => ({ createProductAdAction: vi.fn(), getProductAdState: vi.fn() }));
 vi.mock('@/lib/product-url', async () => await import('../../../../lib/product-url'));
@@ -22,6 +23,12 @@ const product: ProductData = {
 const render = (changes: Partial<ProductData> = {}) => renderToStaticMarkup(
   <ProductPreviewModal product={{ ...product, ...changes }} onClose={() => {}} />
 );
+it('offers removal for the cover and gallery images without duplicate photos', () => {
+  const html = render({ primaryImageUrl: 'https://example.com/a.jpg', imageUrls: ['https://example.com/a.jpg', 'https://example.com/b.jpg'] });
+  expect(html).toContain('Eliminar foto 1');
+  expect(html).toContain('Eliminar foto 2');
+  expect(html).not.toContain('Eliminar foto 3');
+});
 it('shows published state and reconciliation on first opening, never a publish button', () => {
   const html = render({ isPublished: true, instagramPublications: [{ id: 'publication', mediaId: '123' }] });
   expect(html).toContain('IG Activo');

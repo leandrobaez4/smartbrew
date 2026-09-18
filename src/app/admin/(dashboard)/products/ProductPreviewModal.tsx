@@ -22,6 +22,7 @@ import CheckAvailabilityButton from './[id]/CheckAvailabilityButton';
 import AffiliateConfiguration from './AffiliateConfiguration';
 import ProductPublicLink from './ProductPublicLink';
 import ProductAdForm from './ProductAdForm';
+import ProductImageEditor from './ProductImageEditor';
 import { safeAffiliateUrl } from '@/lib/product-url';
 import { 
   updateProductStatusAction 
@@ -149,9 +150,7 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
             </div>
           </div>
 
-          {product.imageUrls.length > 0 && <div className="grid grid-cols-4 gap-2" aria-label="Galería del producto">
-            {product.imageUrls.map((image, index) => <a key={image} href={image} target="_blank" rel="noopener noreferrer"><img src={image} alt={`${product.title} · foto ${index + 1}`} loading="lazy" className="h-20 w-full rounded-xl border border-gray-200 dark:border-gray-700 object-contain" /></a>)}
-          </div>}
+          <ProductImageEditor productId={product.id} title={product.title} primaryImageUrl={product.primaryImageUrl} imageUrls={product.imageUrls} />
 
           <ProductPublicLink productId={product.id} available={product.status === 'ACTIVE' && Boolean(safeAffiliateUrl(product.affiliateUrl))} />
           <ProductAdForm productId={product.id} />
