@@ -1,0 +1,25 @@
+.admin {
+  /* Scope Tailwind's type scale to the admin, including dialogs and login. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.375rem;
+  --text-3xl: 1.625rem;
+
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+.admin :where(h1, h2, h3) {
+  letter-spacing: -0.025em;
+}
+
+/* Avoid automatic input zoom on small touch screens. */
+@media (max-width: 767px) {
+  .admin :is(input, select, textarea) {
+    font-size: 1rem;
+  }
+}
