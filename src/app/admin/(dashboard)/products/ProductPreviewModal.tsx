@@ -1,8 +1,8 @@
 'use client';
+import { useProductLoading } from './ProductLoading';
 
 import { useState } from 'react';
 import { runPublicationAction } from '@/lib/publication-client';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   X, 
@@ -34,8 +34,8 @@ interface ProductPreviewModalProps {
 }
 
 export default function ProductPreviewModal({ product, fromUrl, onClose }: ProductPreviewModalProps) {
-  const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const router = useProductLoading(isProcessing);
   const [copied, setCopied] = useState(false);
 
   if (!product) return null;

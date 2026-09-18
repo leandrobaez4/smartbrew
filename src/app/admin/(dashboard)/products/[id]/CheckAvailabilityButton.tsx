@@ -1,4 +1,5 @@
 'use client';
+import { useProductLoading } from '../ProductLoading';
 
 import { useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -6,6 +7,7 @@ import { checkAvailability } from './actions';
 
 export default function CheckAvailabilityButton({ productId, externalId }: { productId: string, externalId: string }) {
   const [loading, setLoading] = useState(false);
+  const router = useProductLoading(loading);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
   async function handleCheck() {
@@ -14,6 +16,7 @@ export default function CheckAvailabilityButton({ productId, externalId }: { pro
     try {
       const res = await checkAvailability(productId, externalId);
       setResult(res);
+      router.refresh();
     } catch (err: any) {
       setResult({ success: false, message: err.message });
     }

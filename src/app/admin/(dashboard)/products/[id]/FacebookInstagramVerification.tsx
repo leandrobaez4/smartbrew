@@ -1,4 +1,5 @@
 'use client';
+import { useProductLoading } from '../ProductLoading';
 
 import { useState } from 'react';
 import { inspectFacebookInstagramAction } from '../actions';
@@ -9,6 +10,7 @@ export default function FacebookInstagramVerification({ productId, publications 
 }) {
   const [selected, setSelected] = useState(publications[0]?.id || '');
   const [busy, setBusy] = useState(false);
+  useProductLoading(busy);
   const [result, setResult] = useState<Result | null>(null);
   async function verify(withPublication: boolean) {
     setBusy(true); setResult(null);

@@ -1,11 +1,11 @@
 'use client';
+import { useProductLoading } from './ProductLoading';
 
 import { useState } from 'react';
 import { runPublicationAction } from '@/lib/publication-client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ProductStatus } from '@prisma/client';
-import { Camera, Trash2, CheckCircle2, Loader2, Eye, ExternalLink } from 'lucide-react';
+import { Camera, Trash2, CheckCircle2, Eye, ExternalLink } from 'lucide-react';
 import { unpublishFromInstagramAction } from './actions';
 import { enqueueInstagramProductsAction } from './queue-actions';
 import ProductPreviewModal from './ProductPreviewModal';
@@ -43,9 +43,9 @@ export default function ProductTable({ products, total, page, totalPages, search
   search: string,
   statusFilter: string
 }) {
-  const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const router = useProductLoading(isProcessing);
   const [previewProduct, setPreviewProduct] = useState<ProductData | null>(null);
   const visiblePages = paginationPages(page, totalPages);
 
@@ -292,19 +292,6 @@ export default function ProductTable({ products, total, page, totalPages, search
             >
               <Camera size={16} /> Encolar en Instagram
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Loading Overlay */}
-      {isProcessing && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
-          <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border border-gray-200 dark:border-gray-800 max-w-sm text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-pink-600 dark:text-pink-500" />
-            <div>
-              <p className="text-gray-900 dark:text-gray-100 font-semibold text-lg">Procesando...</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Enviando la solicitud. Para publicaciones, la cola continuará trabajando cuando termine este envío.</p>
-            </div>
           </div>
         </div>
       )}

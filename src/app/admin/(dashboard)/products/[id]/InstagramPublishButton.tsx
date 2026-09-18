@@ -1,23 +1,21 @@
 'use client';
+import { useProductLoading } from '../ProductLoading';
 
 import { useState } from 'react';
 import { runPublicationAction } from '@/lib/publication-client';
-import { useRouter } from 'next/navigation';
-import { Camera, Trash2, Loader2, RefreshCw } from 'lucide-react';
+import { Camera, Trash2, RefreshCw } from 'lucide-react';
 import { unpublishFromInstagramAction, verifyInstagramPublicationAction } from '../actions';
 import { enqueueInstagramProductsAction } from '../queue-actions';
 
 export default function InstagramPublishButton({ productId, isPublished, blocked = false, canPublish = true }: { productId: string, isPublished: boolean, blocked?: boolean, canPublish?: boolean }) {
-  const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isEnqueuing, setIsEnqueuing] = useState(false);
+  const router = useProductLoading(isProcessing);
 
   const handlePublish = async () => {
     if (isPublished || blocked || !canPublish || isProcessing) return;
     if (!confirm('¿Agregar este producto a la cola de publicación de Instagram?')) return;
     
     setIsProcessing(true);
-    setIsEnqueuing(true);
     const result = await runPublicationAction(() => enqueueInstagramProductsAction([productId]));
     if (!result.success) {
       alert(`Error al encolar: ${result.message}`);
@@ -25,7 +23,6 @@ export default function InstagramPublishButton({ productId, isPublished, blocked
       alert(result.message || 'Producto encolado. Podés cerrar la pantalla.');
     }
     setIsProcessing(false);
-    setIsEnqueuing(false);
     router.refresh();
   };
 
@@ -92,18 +89,6 @@ export default function InstagramPublishButton({ productId, isPublished, blocked
         {blocked && <button type="button" onClick={() => router.refresh()} className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">Actualizar estado de la cola</button>}
       </div>
 
-      {/* Loading Overlay */}
-      {isProcessing && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
-          <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border border-gray-200 dark:border-gray-800 max-w-sm text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-pink-600 dark:text-pink-500" />
-            <div>
-              <p className="text-gray-900 dark:text-gray-100 font-semibold text-lg">Procesando...</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{isEnqueuing ? 'Agregando a la cola. La publicación continuará en segundo plano.' : 'Conectando con Instagram, por favor no cierres esta ventana.'}</p>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

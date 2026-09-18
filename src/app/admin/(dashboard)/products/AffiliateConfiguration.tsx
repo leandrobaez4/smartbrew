@@ -1,12 +1,12 @@
 'use client';
+import { useProductLoading } from './ProductLoading';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { updateAffiliateUrlAction } from './affiliate-actions';
 import { runPublicationAction } from '@/lib/publication-client';
 
 export default function AffiliateConfiguration({ productId, affiliateUrl }: { productId: string; affiliateUrl: string | null }) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
+  const router = useProductLoading(pending);
   const [message, setMessage] = useState('');
   return (
       <form action={async formData => {

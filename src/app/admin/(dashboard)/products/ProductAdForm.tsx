@@ -1,4 +1,5 @@
 'use client';
+import { useProductLoading } from './ProductLoading';
 import { useEffect, useState } from 'react';
 import { createProductAdAction, getProductAdState } from './ad-actions';
 import { productUrl } from '@/lib/product-url';
@@ -6,9 +7,12 @@ import { productUrl } from '@/lib/product-url';
 export default function ProductAdForm({ productId }: { productId: string }) {
   const [state, setState] = useState<Awaited<ReturnType<typeof getProductAdState>> | null>(null);
   const [busy, setBusy] = useState(false);
+  useProductLoading(busy);
   const [message, setMessage] = useState('');
   async function refresh() {
+    setBusy(true);
     try { setState(await getProductAdState(productId)); } catch { setMessage('No se pudo consultar el estado.'); }
+    finally { setBusy(false); }
   }
   useEffect(() => { let active = true; getProductAdState(productId).then(result => { if (active) setState(result); }).catch(() => { if (active) setMessage('No se pudo consultar el estado.'); }); return () => { active = false; }; }, [productId]);
   return <details className="my-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">

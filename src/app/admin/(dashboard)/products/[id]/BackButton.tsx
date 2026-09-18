@@ -1,15 +1,16 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useProductLoading } from '../ProductLoading';
 import { ArrowLeft } from 'lucide-react';
 
 export default function BackButton() {
-  const router = useRouter();
+  const router = useProductLoading(false);
   const searchParams = useSearchParams();
   const from = searchParams.get('from');
 
   const handleBack = () => {
-    if (from) {
+    if (from && /^\/admin\/products(?:\?|$)/.test(from)) {
       router.push(from);
     } else if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();

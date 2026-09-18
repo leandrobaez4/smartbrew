@@ -1,15 +1,15 @@
 'use client';
+import { useProductLoading } from '../ProductLoading';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { reconcileInstagramPublicationAction } from '../actions';
 import { runPublicationAction } from '@/lib/publication-client';
 
 export default function InstagramReconciliation({ productId, publicationId, mediaId }: { productId: string; publicationId: string; mediaId: string | null }) {
-  const router = useRouter();
   const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [pending, setPending] = useState(false);
+  const router = useProductLoading(pending);
   const [message, setMessage] = useState('');
   return (
     <details className="mt-4 rounded-md border border-amber-400 p-3 text-sm">
