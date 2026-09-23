@@ -2,8 +2,24 @@
 
 import { PrismaClient } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { requireAdmin } from '@/lib/portal';
+import { generateAndSaveProductEditorial } from '@/lib/product-editorial';
 
 const prisma = new PrismaClient();
+
+export async function regenerateProductEditorial(productId: string) {
+  await requireAdmin();
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(productId)) return { success: false, message: 'Producto inválido.' };
+  try {
+    await generateAndSaveProductEditorial(productId, prisma);
+    revalidatePath(`/admin/products/${productId}`);
+    revalidatePath(`/productos/${productId}`);
+    return { success: true, message: 'Contenido editorial regenerado.' };
+  } catch (error) {
+    revalidatePath(`/admin/products/${productId}`);
+    return { success: false, message: error instanceof Error ? error.message : 'No se pudo regenerar el contenido.' };
+  }
+}
 
 export async function checkAvailability(productId: string, externalId: string) {
   try {
@@ -64,10 +80,10 @@ export async function checkAvailability(productId: string, externalId: string) {
     }
 
     return { success: false, message: `⚠️ Error de la API: ${apiResponse.status} ${apiResponse.statusText}` };
-  } catch (error: any) {
-    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       return { success: false, message: '⏳ La API tardó demasiado en responder. Intentá de nuevo en unos segundos.' };
     }
-    return { success: false, message: `❌ Error interno: ${error.message}` };
+    return { success: false, message: `❌ Error interno: ${error instanceof Error ? error.message : 'Error desconocido'}` };
   }
 }

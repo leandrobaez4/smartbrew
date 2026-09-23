@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ find: vi.fn(), update: vi.fn(), job: vi.fn(), publish: vi.fn(), transaction: vi.fn(), upsert: vi.fn(), finish: vi.fn() }));
+const m = vi.hoisted(() => ({ find: vi.fn(), update: vi.fn(), job: vi.fn(), publish: vi.fn(), transaction: vi.fn(), upsert: vi.fn(), finish: vi.fn(), generate: vi.fn() }));
 vi.mock('./portal', () => ({ portalDb: { product: { findUnique: m.find, updateMany: m.update }, jobExecution: { upsert: m.job }, $transaction: m.transaction } }));
 vi.mock('@upstash/qstash', () => ({ Client: class { publishJSON = m.publish; } }));
+vi.mock('./product-editorial', () => ({ generateAndSaveProductEditorial: m.generate }));
 import { parseAffiliateImport } from './affiliate-import-input';
 import { processAffiliateImport, saveOrQueueAffiliate } from './affiliate-import';
 const data = { url: 'https://www.mercadolibre.com.ar/reloj/p/MLA123#tracking=1', title: 'Reloj', affiliateUrl: 'https://meli.la/test', image: '' };
 beforeEach(() => {
   vi.resetAllMocks();
+  m.generate.mockResolvedValue({});
   m.transaction.mockImplementation(fn => fn({ $queryRaw: vi.fn(), product: { findUniqueOrThrow: m.find, updateMany: m.update } }));
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -71,8 +73,9 @@ function worker(status = 'STARTED', count = 1) {
 }
 it('creates a candidate without any publishing and completes the job atomically', async () => {
   worker(); await processAffiliateImport('job');
-  expect(m.upsert.mock.calls[0][0]).toMatchObject({ update: {}, create: { status: 'CANDIDATE', affiliateUrl: data.affiliateUrl } });
+  expect(m.upsert.mock.calls[0][0]).toMatchObject({ update: {}, create: { status: 'CANDIDATE', aiStatus: 'PENDING', originalTitle: data.title, slug: 'reloj-mla123', affiliateUrl: data.affiliateUrl } });
   expect(m.finish.mock.calls[0][0].data.status).toBe('SUCCEEDED');
+  expect(m.generate).toHaveBeenCalledWith('p', expect.anything());
 });
 it('skips already completed deliveries', async () => {
   worker('SUCCEEDED'); await processAffiliateImport('job'); expect(m.upsert).not.toHaveBeenCalled();

@@ -3,6 +3,8 @@ import { Client } from '@upstash/qstash';
 import { portalDb as db } from './portal';
 import { parseAffiliateImport } from './affiliate-import-input';
 import { mergeProductImages } from './product-gallery';
+import { createProductSlug } from './product-slug';
+import { generateAndSaveProductEditorial } from './product-editorial';
 
 export async function saveOrQueueAffiliate(raw: unknown, expectedLink: string | null) {
   const data = parseAffiliateImport(raw);
@@ -33,16 +35,18 @@ export async function saveOrQueueAffiliate(raw: unknown, expectedLink: string | 
 }
 
 export async function processAffiliateImport(jobId: string) {
-  return db.$transaction(async tx => {
+  const productId = await db.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "JobExecution" WHERE id = ${jobId} FOR UPDATE`;
     const job = await tx.jobExecution.findUnique({ where: { id: jobId } });
     if (!job || job.jobName !== 'affiliate_import') throw Error('Trabajo inexistente.');
-    if (job.status === 'SUCCEEDED') return;
+    if (job.status === 'SUCCEEDED') return job.outputJson && typeof job.outputJson === 'object' && 'productId' in job.outputJson
+      ? String(job.outputJson.productId)
+      : null;
     const data = parseAffiliateImport(job.inputJson);
     const product = await tx.product.upsert({
       where: { marketplace_externalId: { marketplace: 'MERCADO_LIBRE', externalId: data.externalId } },
       update: {},
-      create: { marketplace: 'MERCADO_LIBRE', externalId: data.externalId, title: data.title, originalPermalink: data.url, primaryImageUrl: data.image || data.images[0] || null, imageUrls: data.images, affiliateUrl: data.affiliateUrl, status: 'CANDIDATE', selectionReasons: ['Importado desde extensión; precio y disponibilidad pendientes de verificar.'] },
+      create: { marketplace: 'MERCADO_LIBRE', externalId: data.externalId, title: data.title, originalTitle: data.title, slug: createProductSlug(data.title, data.externalId), originalPermalink: data.url, primaryImageUrl: data.image || data.images[0] || null, imageUrls: data.images, affiliateUrl: data.affiliateUrl, status: 'CANDIDATE', aiStatus: 'PENDING', selectionReasons: ['Importado desde extensión; precio y disponibilidad pendientes de verificar.'] },
     });
     // Atomic guard against another import or manual link edit. Never overwrite silently.
     await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${product.id} FOR UPDATE`;
@@ -53,5 +57,7 @@ export async function processAffiliateImport(jobId: string) {
       errorMessage: saved.count ? null : 'El producto ya tiene otro enlace. Confirmá el reemplazo desde el admin.',
       outputJson: { productId: product.id },
     } });
+    return saved.count ? product.id : null;
   });
+  if (productId) await generateAndSaveProductEditorial(productId, db).catch(() => undefined);
 }

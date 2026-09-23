@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
+import { createProductSlug } from './lib/product-slug';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
@@ -80,7 +81,20 @@ const worker = new Worker('affiliate-jobs', async job => {
               }
             },
             update: {
+              title: item.title,
+              originalTitle: item.title,
+              originalDescription: item.originalDescription,
+              categoryId: item.categoryId,
               price: item.price,
+              currencyId: item.currencyId,
+              originalPermalink: item.originalPermalink,
+              primaryImageUrl: item.primaryImageUrl,
+              imageUrls: item.imageUrls,
+              attributesJson: item.attributesJson,
+              sellerId: item.sellerId,
+              sellerReputation: item.sellerReputation,
+              aiStatus: 'PENDING',
+              aiError: null,
               status: scoreResult.status === 'SELECTED' ? 'ACTIVE' : 'CANDIDATE',
               opportunityScore: scoreResult.opportunityScore,
               priceTier: scoreResult.priceTier,
@@ -95,14 +109,20 @@ const worker = new Worker('affiliate-jobs', async job => {
               externalId: item.externalId,
               siteId: 'MLA',
               title: item.title,
+              originalTitle: item.title,
+              slug: createProductSlug(item.title, item.externalId),
+              originalDescription: item.originalDescription,
               categoryId: item.categoryId,
               price: item.price,
               currencyId: item.currencyId,
               originalPermalink: item.originalPermalink,
               primaryImageUrl: item.primaryImageUrl,
+              imageUrls: item.imageUrls,
+              attributesJson: item.attributesJson,
               sellerId: item.sellerId,
               sellerReputation: item.sellerReputation,
               status: scoreResult.status === 'SELECTED' ? 'ACTIVE' : 'CANDIDATE',
+              aiStatus: 'PENDING',
               opportunityScore: scoreResult.opportunityScore,
               priceTier: scoreResult.priceTier,
               problemSolved: scoreResult.problemSolved,

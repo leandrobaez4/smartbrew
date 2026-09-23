@@ -1,8 +1,10 @@
 'use server';
 
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { MercadoLibreClient } from '@/lib/domain/ml-client';
 import { calculateOpportunityScore } from '@/lib/domain/scoring';
+import { createProductSlug } from '@/lib/product-slug';
+import { generateAndSaveProductEditorial } from '@/lib/product-editorial';
 import { redirect } from 'next/navigation';
 
 const prisma = new PrismaClient();
@@ -46,7 +48,7 @@ export async function importProductAction(prevState: { error: string | null }, f
     
     const scoreResult = calculateOpportunityScore(scoreInput);
     
-    await prisma.product.upsert({
+    const product = await prisma.product.upsert({
       where: {
         marketplace_externalId: {
           marketplace: 'MERCADO_LIBRE',
@@ -54,14 +56,27 @@ export async function importProductAction(prevState: { error: string | null }, f
         }
       },
       update: {
+        title: item.title,
+        originalTitle: item.title,
+        originalDescription: item.originalDescription,
+        categoryId: item.categoryId,
         price: item.price,
+        currencyId: item.currencyId,
+        originalPermalink: item.originalPermalink,
+        primaryImageUrl: item.primaryImageUrl,
+        imageUrls: item.imageUrls,
+        attributesJson: item.attributesJson ?? Prisma.JsonNull,
+        sellerId: item.sellerId,
+        sellerReputation: item.sellerReputation,
+        aiStatus: 'PENDING',
+        aiError: null,
         status: 'CANDIDATE',
         opportunityScore: scoreResult.opportunityScore,
         priceTier: scoreResult.priceTier,
         problemSolved: scoreResult.problemSolved,
         reelHook: scoreResult.reelHook,
         explanationDifficulty: scoreResult.explanationDifficulty,
-        selectionReasons: ['Importado manualmente', ...(scoreResult.selectionReasons as any)],
+        selectionReasons: ['Importado manualmente', ...scoreResult.selectionReasons],
         lastMarketplaceSyncAt: new Date()
       },
       create: {
@@ -69,27 +84,34 @@ export async function importProductAction(prevState: { error: string | null }, f
         externalId: item.externalId,
         siteId: 'MLA',
         title: item.title,
+        originalTitle: item.title,
+        slug: createProductSlug(item.title, item.externalId),
+        originalDescription: item.originalDescription,
         categoryId: item.categoryId,
         price: item.price,
         currencyId: item.currencyId,
         originalPermalink: item.originalPermalink,
         primaryImageUrl: item.primaryImageUrl,
+        imageUrls: item.imageUrls,
+        attributesJson: item.attributesJson ?? Prisma.JsonNull,
         sellerId: item.sellerId,
         sellerReputation: item.sellerReputation,
         status: 'CANDIDATE',
+        aiStatus: 'PENDING',
         opportunityScore: scoreResult.opportunityScore,
         priceTier: scoreResult.priceTier,
         problemSolved: scoreResult.problemSolved,
         reelHook: scoreResult.reelHook,
         explanationDifficulty: scoreResult.explanationDifficulty,
-        selectionReasons: ['Importado manualmente', ...(scoreResult.selectionReasons as any)],
+        selectionReasons: ['Importado manualmente', ...scoreResult.selectionReasons],
         lastMarketplaceSyncAt: new Date()
       }
     });
+    await generateAndSaveProductEditorial(product.id, prisma).catch(() => undefined);
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
-    return { error: 'Error al importar de Mercado Libre: ' + err.message };
+    return { error: 'Error al importar de Mercado Libre: ' + (err instanceof Error ? err.message : 'Error desconocido') };
   }
 
   redirect('/admin/products');

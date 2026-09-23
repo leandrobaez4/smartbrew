@@ -41,6 +41,7 @@ export async function publishOne(productId: string) {
       : 'Hay una publicación en curso o pendiente de conciliación. No se reintentará para evitar duplicados.');
     if (!product.affiliateUrl || !product.primaryImageUrl) throw new PublicationError('El producto necesita imagen y enlace de afiliado.');
     const images = mergeProductImages([product.primaryImageUrl], product.imageUrls);
+    if (!images.length) throw new PublicationError('El producto no tiene imágenes compatibles. Los videos importados de Mercado Libre no se publican como fotos en Instagram.');
     if (images.length > 10) throw new PublicationError('El producto tiene más de 10 imágenes. El carrusel admite hasta 10 en esta integración; ajustá la galería antes de publicar. No se publicaron imágenes ni se recortó la selección.');
     let draft = await tx.contentDraft.findFirst({ where: { productId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
     if (!draft) draft = await tx.contentDraft.create({ data: {

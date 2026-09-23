@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    exclude: ['node_modules', 'e2e/**/*', 'extensions/**/*.test.mjs'],
+    exclude: ['node_modules', '.kilo/**', 'e2e/**/*', 'extensions/**/*.test.mjs'],
   },
 });

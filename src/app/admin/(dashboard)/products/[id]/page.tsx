@@ -10,6 +10,7 @@ import InstagramPublishButton from './InstagramPublishButton';
 import BackButton from './BackButton';
 import InstagramReconciliation from './InstagramReconciliation';
 import FacebookInstagramVerification from './FacebookInstagramVerification';
+import RegenerateEditorialButton from './RegenerateEditorialButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </div>
 
           <CheckAvailabilityButton productId={product.id} externalId={product.externalId || ''} />
+          <RegenerateEditorialButton productId={product.id} aiStatus={product.aiStatus} aiError={product.aiError} />
           
           <InstagramPublishButton productId={product.id} isPublished={isPublished} blocked={instagramBlocked} canPublish={Boolean(product.affiliateUrl && product.primaryImageUrl)} />
           {product.drafts.flatMap(d => d.publications).filter(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED' && !pub.deletedAt).map(pub => (

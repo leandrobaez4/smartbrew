@@ -17,47 +17,48 @@ model User {
 
 // Invited portal members are deliberately NOT admin Users.
 model PortalMember {
-  id           String @id @default(cuid())
-  email        String @unique
-  passwordHash String?
-  inviteHash   String? @unique
+  id              String               @id @default(cuid())
+  email           String               @unique
+  passwordHash    String?
+  inviteHash      String?              @unique
   inviteExpiresAt DateTime?
-  reviewTokenHash String? @unique
+  reviewTokenHash String?              @unique
   reviewExpiresAt DateTime?
-  disabled     Boolean @default(false)
-  loginAttempts Int @default(0)
-  loginWindowEnd DateTime?
-  createdAt    DateTime @default(now())
-  sessions     PortalSession[]
-  connection   InstagramConnection?
+  disabled        Boolean              @default(false)
+  loginAttempts   Int                  @default(0)
+  loginWindowEnd  DateTime?
+  createdAt       DateTime             @default(now())
+  sessions        PortalSession[]
+  connection      InstagramConnection?
 }
 
 model PortalSession {
-  tokenHash String @id
-  memberId String
-  member PortalMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  oauthStateHash String? @unique
+  tokenHash      String       @id
+  memberId       String
+  member         PortalMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  oauthStateHash String?      @unique
   oauthExpiresAt DateTime?
+
   @@index([memberId])
 }
 
 model InstagramConnection {
-  id String @id @default(cuid())
-  memberId String @unique
-  member PortalMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  instagramId String @unique
-  username String
+  id             String       @id @default(cuid())
+  memberId       String       @unique
+  member         PortalMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  instagramId    String       @unique
+  username       String
   encryptedToken String
-  expiresAt DateTime
-  updatedAt DateTime @updatedAt
+  expiresAt      DateTime
+  updatedAt      DateTime     @updatedAt
 }
 
 // Separate from production products/publications. One durable attempt per review access.
 model ReviewPublication {
-  memberId    String @id
+  memberId    String   @id
   instagramId String
-  status      String @default("PROCESSING")
+  status      String   @default("PROCESSING")
   containerId String?
   mediaId     String?
   message     String?
@@ -65,38 +66,80 @@ model ReviewPublication {
 }
 
 model Product {
-  id                   String   @id @default(cuid())
-  marketplace          String   @default("MERCADO_LIBRE")
-  externalId           String?
-  siteId               String   @default("MLA")
-  title                String
-  categoryId           String?
-  price                Decimal?
-  currencyId           String?
-  originalPermalink    String
-  affiliateUrl         String?
-  primaryImageUrl      String?
-  imageUrls            String[] @default([])
-  attributesJson       Json?
-  sellerId             String?
-  sellerReputation     String?
-  status               ProductStatus @default(CANDIDATE)
-  
+  id                  String          @id @default(cuid())
+  marketplace         String          @default("MERCADO_LIBRE")
+  externalId          String?
+  siteId              String          @default("MLA")
+  title               String
+  originalTitle       String?
+  originalDescription String?
+  displayTitle        String?
+  shortDescription    String?
+  description         String?
+  whyWePickedIt       Json?
+  idealFor            String?
+  highlights          Json?
+  seoTitle            String?
+  seoDescription      String?
+  category            String?
+  tags                String[]        @default([])
+  slug                String?         @unique
+  aiStatus            ProductAIStatus @default(PENDING)
+  aiError             String?
+  categoryId          String?
+  price               Decimal?
+  currencyId          String?
+  originalPermalink   String
+  affiliateUrl        String?
+  primaryImageUrl     String?
+  imageUrls           String[]        @default([])
+  attributesJson      Json?
+  sellerId            String?
+  sellerReputation    String?
+  status              ProductStatus   @default(CANDIDATE)
+
   // Scoring Fields
-  opportunityScore     Int?
-  priceTier            String?
-  problemSolved        String?
-  reelHook             String?
+  opportunityScore      Int?
+  priceTier             String?
+  problemSolved         String?
+  reelHook              String?
   explanationDifficulty String?
-  selectionReasons     Json?
+  selectionReasons      Json?
 
   lastMarketplaceSyncAt DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  drafts               ContentDraft[]
+  drafts      ContentDraft[]
+  collections CollectionProduct[]
 
   @@unique([marketplace, externalId])
+}
+
+model Collection {
+  id             String              @id @default(cuid())
+  slug           String              @unique
+  title          String
+  description    String?
+  seoTitle       String?
+  seoDescription String?
+  image          String?
+  published      Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  products       CollectionProduct[]
+}
+
+model CollectionProduct {
+  collectionId String
+  productId    String
+  position     Int
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, productId])
+  @@unique([collectionId, position])
+  @@index([productId])
 }
 
 enum ProductStatus {
@@ -106,27 +149,34 @@ enum ProductStatus {
   ARCHIVED
 }
 
-model ContentDraft {
-  id                  String   @id @default(cuid())
-  productId           String
-  product             Product  @relation(fields: [productId], references: [id])
-  hook                String?
-  benefitsJson        Json?    // list of exactly 3 measurable benefits
-  disclaimer          String?
-  caption             String?
-  hashtagsJson        Json?
-  cta                 String?
-  priceSnapshot       Decimal?
-  currencySnapshot    String?
-  template            String   @default("STATIC_CARDS_V1")
-  status              DraftStatus @default(DRAFT)
-  validationErrorsJson Json?
-  approvedAt          DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+enum ProductAIStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 
-  assets              MediaAsset[]
-  publications        Publication[]
+model ContentDraft {
+  id                   String      @id @default(cuid())
+  productId            String
+  product              Product     @relation(fields: [productId], references: [id])
+  hook                 String?
+  benefitsJson         Json? // list of exactly 3 measurable benefits
+  disclaimer           String?
+  caption              String?
+  hashtagsJson         Json?
+  cta                  String?
+  priceSnapshot        Decimal?
+  currencySnapshot     String?
+  template             String      @default("STATIC_CARDS_V1")
+  status               DraftStatus @default(DRAFT)
+  validationErrorsJson Json?
+  approvedAt           DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  assets       MediaAsset[]
+  publications Publication[]
 }
 
 enum DraftStatus {
@@ -141,18 +191,18 @@ enum DraftStatus {
 }
 
 model MediaAsset {
-  id             String   @id @default(cuid())
-  contentDraftId String
-  draft          ContentDraft @relation(fields: [contentDraftId], references: [id])
-  kind           AssetKind
-  localPath      String?
-  publicUrl      String?
-  mimeType       String
-  width          Int?
-  height         Int?
+  id              String       @id @default(cuid())
+  contentDraftId  String
+  draft           ContentDraft @relation(fields: [contentDraftId], references: [id])
+  kind            AssetKind
+  localPath       String?
+  publicUrl       String?
+  mimeType        String
+  width           Int?
+  height          Int?
   durationSeconds Float?
-  checksum       String?
-  createdAt      DateTime @default(now())
+  checksum        String?
+  createdAt       DateTime     @default(now())
 }
 
 enum AssetKind {
@@ -162,10 +212,10 @@ enum AssetKind {
 }
 
 model Publication {
-  id                  String   @id @default(cuid())
+  id                  String            @id @default(cuid())
   contentDraftId      String
-  draft               ContentDraft @relation(fields: [contentDraftId], references: [id])
-  platform            String   @default("INSTAGRAM")
+  draft               ContentDraft      @relation(fields: [contentDraftId], references: [id])
+  platform            String            @default("INSTAGRAM")
   scheduledFor        DateTime?
   publishedAt         DateTime?
   externalContainerId String?
@@ -173,11 +223,11 @@ model Publication {
   externalPermalink   String?
   deletedAt           DateTime?
   status              PublicationStatus @default(QUEUED)
-  attemptCount        Int      @default(0)
+  attemptCount        Int               @default(0)
   lastErrorCode       String?
   lastErrorMessage    String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 }
 
 enum PublicationStatus {
@@ -189,7 +239,7 @@ enum PublicationStatus {
 }
 
 model JobExecution {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   jobName      String
   entityType   String?
   entityId     String?
@@ -197,7 +247,7 @@ model JobExecution {
   inputJson    Json?
   outputJson   Json?
   errorMessage String?
-  startedAt    DateTime @default(now())
+  startedAt    DateTime  @default(now())
   finishedAt   DateTime?
 }
 
@@ -220,8 +270,8 @@ model HtmlImportJob {
 
 model SystemLog {
   id        String   @id @default(cuid())
-  level     String   // INFO, WARN, ERROR
-  source    String   // e.g., 'instagram_publish', 'mercadolibre_sync'
+  level     String // INFO, WARN, ERROR
+  source    String // e.g., 'instagram_publish', 'mercadolibre_sync'
   message   String
   details   Json?
   createdAt DateTime @default(now())

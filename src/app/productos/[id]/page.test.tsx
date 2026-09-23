@@ -12,11 +12,33 @@ beforeEach(() => { vi.resetAllMocks(); });
 it('renders a public product, gallery and affiliate CTA without price', async () => {
   m.find.mockResolvedValue({ title: 'Cafetera', affiliateUrl: 'https://meli.la/a', primaryImageUrl: 'https://http2.mlstatic.com/a.jpg', imageUrls: ['https://http2.mlstatic.com/b.jpg'] });
   const html = renderToStaticMarkup(await Page({ params: Promise.resolve({ id: 'product' }) }));
-  expect(html).toContain('Comprar en Mercado Libre');
+  expect(html).toContain('Ver precio en Mercado Libre');
   expect(html).toContain('https://meli.la/a');
   expect(html).toContain('Ver foto 2');
   expect(html).toContain('Enlace de afiliado');
   expect(m.find.mock.calls[0][0].where).toEqual({ id: 'product', status: 'ACTIVE', affiliateUrl: { not: null } });
+});
+it('renders editorial fields and price without replacing them with invented copy', async () => {
+  m.find.mockResolvedValue({
+    title: 'Título original',
+    displayTitle: 'Cafetera SmartBrew',
+    shortDescription: 'Café simple para todos los días.',
+    description: 'Descripción editorial basada en los datos disponibles.',
+    whyWePickedIt: ['Uso sencillo', 'Diseño compacto', 'Datos verificables'],
+    idealFor: 'Personas que buscan una cafetera compacta.',
+    highlights: ['Capacidad informada', 'Controles simples', 'Formato compacto'],
+    price: '125000',
+    currencyId: 'ARS',
+    affiliateUrl: 'https://meli.la/a',
+    imageUrls: [],
+  });
+  const html = renderToStaticMarkup(await Page({ params: Promise.resolve({ id: 'product' }) }));
+  expect(html).toContain('Cafetera SmartBrew');
+  expect(html).toContain('Por qué lo elegimos');
+  expect(html).toContain('Ideal para');
+  expect(html).toContain('Características destacadas');
+  expect(html).toContain('125.000');
+  expect(html).toContain('La compra se realiza en Mercado Libre');
 });
 it('returns 404 for missing or unavailable products', async () => {
   m.find.mockResolvedValue(null);

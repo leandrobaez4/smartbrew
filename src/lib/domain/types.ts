@@ -3,13 +3,16 @@ import { z } from "zod";
 export interface MarketplaceProduct {
   externalId: string;
   title: string;
+  originalDescription: string | null;
   categoryId: string | null;
   price: number | null;
   currencyId: string | null;
   originalPermalink: string;
   primaryImageUrl: string | null;
-  attributesJson: Record<string, any> | null;
+  imageUrls: string[];
+  attributesJson: Record<string, string> | null;
   sellerId: string | null;
+  seller: string | null;
   sellerReputation: string | null;
   isAvailable: boolean;
   hasFastShipping?: boolean;
@@ -42,7 +45,7 @@ export interface CopyGenerationInput {
   productTitle: string;
   productPrice: number | null;
   productCurrency: string | null;
-  productAttributes: Record<string, any> | null;
+  productAttributes: Record<string, unknown> | null;
 }
 
 export interface CopyGenerator {

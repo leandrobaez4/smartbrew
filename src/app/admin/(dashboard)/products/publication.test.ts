@@ -67,6 +67,19 @@ it('rejects more than ten images without silently truncating or calling Meta', a
   expect(m.meta).not.toHaveBeenCalled();
   expect(m.create).not.toHaveBeenCalled();
 });
+it('rejects products whose stored gallery only contains Mercado Libre videos', async () => {
+  m.product.mockResolvedValue({
+    id: 'product',
+    affiliateUrl: 'https://example.org/product',
+    primaryImageUrl: 'https://http2.mlstatic.com/demo.mp4',
+    imageUrls: ['https://http2.mlstatic.com/demo.webm'],
+  });
+  const result = await publishToInstagramAction(['product']);
+  expect(result).toMatchObject({ success: false });
+  expect(result.message).toContain('no tiene imágenes compatibles');
+  expect(m.meta).not.toHaveBeenCalled();
+  expect(m.create).not.toHaveBeenCalled();
+});
 it('includes the comment-to-DM invitation and affiliate link in product captions', async () => {
   expect((await publishToInstagramAction(['product'])).success).toBe(true);
   const caption = m.meta.mock.calls[0][2].body.get('caption');

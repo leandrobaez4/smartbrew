@@ -1,29 +1,66 @@
 import { PrismaClient } from "@prisma/client";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { productPath, safeAffiliateUrl } from "@/lib/product-url";
+import ProductGrid from './ProductGrid';
+import { PRODUCT_CATEGORIES } from '@/lib/product-categories';
+import { filterPublicProducts } from '@/lib/product-search';
 
 export const dynamic = "force-dynamic";
 
 const prisma = new PrismaClient();
 
+type PublicProduct = {
+  id: string;
+  title: string;
+  originalTitle: string | null;
+  displayTitle: string | null;
+  shortDescription: string | null;
+  category: string | null;
+  tags: string[];
+  primaryImageUrl: string | null;
+  affiliateUrl: string | null;
+};
+
+type ProductSearchParams = { q?: string | string[]; categoria?: string | string[] };
+
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
 async function getPublicProducts() {
   try {
-    return await prisma.product.findMany({
+    const products = await prisma.product.findMany({
       where: {
         status: "ACTIVE",
         affiliateUrl: { not: null },
       },
+      select: {
+        id: true,
+        title: true,
+        originalTitle: true,
+        displayTitle: true,
+        shortDescription: true,
+        category: true,
+        tags: true,
+        primaryImageUrl: true,
+        affiliateUrl: true,
+      },
       orderBy: { createdAt: "desc" },
     });
+    return { products, failed: false };
   } catch {
-    return [];
+    return { products: [] as PublicProduct[], failed: true };
   }
 }
 
-export default async function ProductosPage() {
-  const products = await getPublicProducts();
+export default async function ProductosPage({ searchParams }: { searchParams?: Promise<ProductSearchParams> }) {
+  const params = searchParams ? await searchParams : {};
+  const query = firstParam(params.q).trim();
+  const requestedCategory = firstParam(params.categoria);
+  const category = PRODUCT_CATEGORIES.some(({ slug }) => slug === requestedCategory) ? requestedCategory : '';
+  const { products, failed } = await getPublicProducts();
+  const visibleProducts = filterPublicProducts(products, query, category);
 
   return (
     <div className="catalog-page">
@@ -44,27 +81,30 @@ export default async function ProductosPage() {
           Productos elegidos por su utilidad, diseño y experiencia.
         </p>
 
-        <div className="product-grid">
-          {products.filter(product => safeAffiliateUrl(product.affiliateUrl)).map((product) => (
-            <article key={product.id} className="product-card">
-              {product.primaryImageUrl && (
-                <Link href={productPath(product.id)}><img src={product.primaryImageUrl} alt={product.title} className="product-image" /></Link>
-              )}
-              <div className="product-body">
-                <h2><Link href={productPath(product.id)}>{product.title}</Link></h2>
-                <Link href={productPath(product.id)} className="product-link">
-                  Ver producto <ArrowUpRight aria-hidden="true" size={18} />
-                </Link>
-              </div>
-            </article>
-          ))}
+        <form className="catalog-filters" action="/productos" method="get" role="search">
+          <label className="catalog-search">
+            <span>Buscar productos</span>
+            <input name="q" type="search" defaultValue={query} placeholder="Ej. cafetera, auriculares o escritorio" />
+          </label>
+          <label className="catalog-category-filter">
+            <span>Categoría</span>
+            <select name="categoria" defaultValue={category}>
+              <option value="">Todas las categorías</option>
+              {PRODUCT_CATEGORIES.map(({ slug, name }) => <option key={slug} value={slug}>{name}</option>)}
+            </select>
+          </label>
+          <button type="submit">Aplicar filtros</button>
+          {(query || category) && <Link href="/productos" className="catalog-clear">Limpiar</Link>}
+        </form>
 
-          {products.length === 0 && (
-            <p className="catalog-empty">
-              Estamos preparando una nueva selección. Volvé pronto para descubrir nuestros recomendados.
+        {failed
+          ? <p className="catalog-empty" role="alert">No pudimos cargar los productos. Intentá nuevamente en unos minutos.</p>
+          : <>
+            <p className="catalog-results" aria-live="polite">
+              {visibleProducts.length} {visibleProducts.length === 1 ? 'producto encontrado' : 'productos encontrados'}
             </p>
-          )}
-        </div>
+            <ProductGrid products={visibleProducts} />
+          </>}
       </main>
 
       <footer className="catalog-footer">

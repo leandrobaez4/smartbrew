@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## SmartBrew Plane workflow
+
+For every autonomous or scheduled SmartBrew run, read and follow
+`docs/plane-workflow.md` before selecting or changing a Plane ticket.
+This workflow is persistent repository policy and does not depend on chat context.

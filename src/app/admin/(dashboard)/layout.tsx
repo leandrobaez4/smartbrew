@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { logoutAction } from '../login/actions';
-import { Camera, Package, FileText, Share2 } from 'lucide-react';
+import { Camera, Package, FileText, Share2, Layers3 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +19,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/products" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <Package size={20} />
             <span>Productos</span>
+          </Link>
+          <Link href="/admin/collections" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <Layers3 size={20} />
+            <span>Colecciones</span>
           </Link>
           <Link href="/admin/imports" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <FileText size={20} />

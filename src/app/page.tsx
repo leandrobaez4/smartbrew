@@ -1,20 +1,45 @@
 import Image from "next/image";
 import Link from "next/link";
+import { PrismaClient } from "@prisma/client";
 import {
   ArrowRight,
   ArrowUpRight,
+  BadgeDollarSign,
   Cable,
   Coffee,
   Cpu,
   Gauge,
   Headphones,
+  House,
+  SearchCheck,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
 } from "lucide-react";
+import CategoryNavigation from './CategoryNavigation';
+import ProductGrid from '@/app/productos/ProductGrid';
+import {
+  HOME_FEATURED_COLLECTION_SLUG,
+  loadHomeFeaturedProducts,
+} from '@/lib/home-featured';
+
+export const dynamic = 'force-dynamic';
+
+const db = new PrismaClient();
 
 const categories = [
   {
     number: "01",
+    slug: "cafe",
+    icon: Coffee,
+    title: "Café",
+    description:
+      "Productos y accesorios para preparar, servir y disfrutar un mejor café.",
+    tone: "cyan",
+  },
+  {
+    number: "02",
+    slug: "tecnologia",
     icon: Cpu,
     title: "Tecnología",
     description:
@@ -22,7 +47,8 @@ const categories = [
     tone: "cyan",
   },
   {
-    number: "02",
+    number: "03",
+    slug: "gadgets",
     icon: Cable,
     title: "Gadgets",
     description:
@@ -30,16 +56,49 @@ const categories = [
     tone: "copper",
   },
   {
-    number: "03",
-    icon: Coffee,
-    title: "Café",
+    number: "04",
+    slug: "smart-home",
+    icon: House,
+    title: "Smart Home",
     description:
-      "Productos y accesorios para preparar, servir y disfrutar un mejor café.",
-    tone: "cyan",
+      "Tecnología útil para hacer tu casa más cómoda, simple y conectada.",
+    tone: "copper",
   },
 ];
 
-export default function Home() {
+async function getFeaturedProducts() {
+  return loadHomeFeaturedProducts(async () => {
+    const collection = await db.collection.findFirst({
+      where: { slug: HOME_FEATURED_COLLECTION_SLUG, published: true },
+      select: {
+        products: {
+          where: { product: { status: 'ACTIVE', affiliateUrl: { not: null } } },
+          orderBy: { position: 'asc' },
+          take: 8,
+          select: {
+            product: {
+              select: {
+                id: true,
+                title: true,
+                displayTitle: true,
+                shortDescription: true,
+                category: true,
+                primaryImageUrl: true,
+                affiliateUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return collection?.products.map(({ product }) => product) ?? [];
+  });
+}
+
+export default async function Home() {
+  const featuredProducts = await getFeaturedProducts();
+
   return (
     <main className="site-shell">
       <header className="site-header">
@@ -48,11 +107,7 @@ export default function Home() {
           <span className="brand-name"><strong>Smart</strong>Brew</span>
         </Link>
 
-        <nav className="desktop-nav" aria-label="Navegación principal">
-          <a href="#categorias">Categorías</a>
-          <a href="#nosotros">Nosotros</a>
-          <Link href="/productos">Productos</Link>
-        </nav>
+        <CategoryNavigation />
 
         <Link href="/productos" className="header-cta">
           Ver selección <ArrowUpRight aria-hidden="true" size={17} />
@@ -69,10 +124,12 @@ export default function Home() {
             más simples, conectados y disfrutables tus momentos cotidianos.
           </p>
           <div className="hero-actions">
-            <Link href="/productos" className="button button-primary">
-              Explorar productos <ArrowRight aria-hidden="true" size={19} />
+            <a href="#recomendados" className="button button-primary">
+              Ver recomendados <ArrowRight aria-hidden="true" size={19} />
+            </a>
+            <Link href="/categorias/cafe" className="button button-ghost">
+              Explorar café
             </Link>
-            <a href="#nosotros" className="button button-ghost">Conocé SmartBrew</a>
           </div>
         </div>
 
@@ -101,7 +158,7 @@ export default function Home() {
         <div className="section-heading">
           <div>
             <span className="section-kicker">Lo que elegimos</span>
-            <h2>Un universo para curiosos.</h2>
+            <h2>Explorá SmartBrew.</h2>
           </div>
           <p>
             Menos ruido, mejores elecciones. Reunimos productos que combinan
@@ -122,12 +179,68 @@ export default function Home() {
                   <h3>{category.title}</h3>
                   <p>{category.description}</p>
                 </div>
-                <Link href="/productos" aria-label={`Ver productos de ${category.title}`}>
+                <Link href={`/categorias/${category.slug}`} aria-label={`Ver productos de ${category.title}`}>
                   Ver productos <ArrowUpRight aria-hidden="true" size={18} />
                 </Link>
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="recommendations section-pad" id="recomendados" aria-labelledby="recommendations-title">
+        <div className="section-heading">
+          <div>
+            <span className="section-kicker">Selección editorial</span>
+            <h2 id="recommendations-title">Recomendados SmartBrew.</h2>
+          </div>
+          <p>
+            Una selección breve de productos que se destacan por utilidad,
+            diseño y experiencia de uso.
+          </p>
+        </div>
+        {featuredProducts.length ? (
+          <ProductGrid products={featuredProducts} />
+        ) : (
+          <div className="recommendations-empty">
+            <p>Estamos preparando nuestra próxima selección recomendada.</p>
+            <Link href="/productos" className="product-link">
+              Explorar todos los productos <ArrowUpRight aria-hidden="true" size={18} />
+            </Link>
+          </div>
+        )}
+      </section>
+
+      <section className="selection-process section-pad" aria-labelledby="selection-process-title">
+        <div className="section-heading">
+          <div>
+            <span className="section-kicker">Transparencia</span>
+            <h2 id="selection-process-title">Cómo elegimos.</h2>
+          </div>
+          <p>
+            Investigamos cada recomendación y explicamos con claridad cómo
+            funciona nuestra relación de afiliados.
+          </p>
+        </div>
+        <div className="selection-process-grid">
+          <article>
+            <SearchCheck aria-hidden="true" size={28} />
+            <span>01</span>
+            <h3>Seleccionamos con criterio</h3>
+            <p>Priorizamos utilidad real, calidad, buenas reseñas y una experiencia de uso clara.</p>
+          </article>
+          <article>
+            <ShoppingBag aria-hidden="true" size={28} />
+            <span>02</span>
+            <h3>Comprás en Mercado Libre</h3>
+            <p>El enlace te lleva al sitio del vendedor, donde revisás precio, envío y condiciones antes de comprar.</p>
+          </article>
+          <article>
+            <BadgeDollarSign aria-hidden="true" size={28} />
+            <span>03</span>
+            <h3>Podemos recibir una comisión</h3>
+            <p>Si comprás desde un enlace afiliado, SmartBrew puede recibir una comisión sin costo adicional para vos.</p>
+          </article>
         </div>
       </section>
 
