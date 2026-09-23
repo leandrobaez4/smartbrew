@@ -88,13 +88,21 @@ it('rejects products whose stored gallery only contains Mercado Libre videos', a
 it('includes the comment-to-DM invitation and affiliate link in product captions', async () => {
   expect((await publishToInstagramAction(['product'])).success).toBe(true);
   const caption = m.meta.mock.calls[0][2].body.get('caption');
-  expect(caption).toBe('Product\n\n💬 Comentá "Info", "Precio" o "Quiero" y te enviamos el enlace del producto por mensaje privado.\n\nLink: https://example.org/product');
+  expect(caption).toBe('Product\n\nComentá "Info" y te enviamos el enlace del producto por mensaje privado.\n\nLink: https://example.org/product');
 });
 it('does not duplicate an existing invitation or affiliate link', async () => {
-  const caption = 'Product\n\n💬 Comentá "Info", "Precio" o "Quiero" y te enviamos el enlace del producto por mensaje privado.\n\nLink: https://example.org/product';
+  const caption = 'Product\n\nComentá "Info" y te enviamos el enlace del producto por mensaje privado.\n\nLink: https://example.org/product';
   m.draft.mockResolvedValue({ id: 'draft', caption });
   expect((await publishToInstagramAction(['product'])).success).toBe(true);
   expect(m.meta.mock.calls[0][2].body.get('caption')).toBe(caption);
+});
+it('replaces the previous multi-keyword invitation in saved drafts', async () => {
+  m.draft.mockResolvedValue({ id: 'draft', caption: 'Product\n\n💬 Comentá "Info", "Precio" o "Quiero" y te enviamos el enlace del producto por mensaje privado.' });
+  expect((await publishToInstagramAction(['product'])).success).toBe(true);
+  const caption = m.meta.mock.calls[0][2].body.get('caption');
+  expect(caption).not.toContain('Precio');
+  expect(caption).not.toContain('Quiero');
+  expect(caption.match(/Comentá/g)).toHaveLength(1);
 });
 function setupInspection() {
   vi.stubEnv('INSTAGRAM_DELETE_FACEBOOK_ACCESS_TOKEN', 'facebook-secret');

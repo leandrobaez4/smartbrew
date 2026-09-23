@@ -101,14 +101,8 @@ export async function processInstagramComment(change: any) {
 
   console.log(`[IG Webhook] Comentario recibido de @${fromUsername}: "${commentText}" en media ${mediaId}`);
 
-  // Palabras clave que indican interés en el link/producto
-  const triggerKeywords = ['quiero', 'link', 'precio', 'info', 'alias', 'comprar', 'donde', 'dónde', 'pasa', 'me interesa', 'oferta'];
-  const hasTriggerWord = triggerKeywords.some(kw => commentText.includes(kw));
-
-  // Si no tiene palabras clave pero es un comentario corto (ej: "yo", "yo quiero", emojis), respondemos igual
-  const isShortInterest = commentText.length <= 15 && (commentText.includes('yo') || commentText.includes('info') || commentText.includes('link'));
-
-  if (!hasTriggerWord && !isShortInterest && commentText !== '') {
+  // Misma regla que Facebook: únicamente Info, sin distinguir mayúsculas.
+  if (commentText !== 'info') {
     console.log(`[IG Webhook] Comentario no coincide con palabras clave de activación.`);
     return;
   }
