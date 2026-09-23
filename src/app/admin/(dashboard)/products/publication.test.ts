@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 vi.mock('@/lib/instagram-publish', async () => await import('../../../../lib/instagram-publish'));
-const m = vi.hoisted(() => ({ auth: vi.fn(), transaction: vi.fn(), lock: vi.fn(), product: vi.fn(), active: vi.fn(), draft: vi.fn(), create: vi.fn(), update: vi.fn(), list: vi.fn(), meta: vi.fn(), audit: vi.fn(), wait: vi.fn() }));
+const m = vi.hoisted(() => ({ auth: vi.fn(), transaction: vi.fn(), lock: vi.fn(), product: vi.fn(), active: vi.fn(), draft: vi.fn(), create: vi.fn(), update: vi.fn(), list: vi.fn(), meta: vi.fn(), audit: vi.fn(), wait: vi.fn(), containerStatus: vi.fn() }));
 vi.mock('@prisma/client', () => ({ PrismaClient: class {
   $transaction = m.transaction;
   publication = { update: m.update, findMany: m.list };
@@ -9,7 +9,7 @@ vi.mock('@/lib/session', () => ({ getSession: m.auth }));
 vi.mock('@/lib/logger', () => ({ logSystemEvent: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/meta-api', async () => ({ ...await import('../../../../lib/meta-api'), requestMeta: m.meta }));
-vi.mock('@/lib/instagram-container', async () => ({ ...await import('../../../../lib/instagram-container'), waitForInstagramContainer: m.wait }));
+vi.mock('@/lib/instagram-container', async () => ({ ...await import('../../../../lib/instagram-container'), waitForInstagramContainer: m.wait, getInstagramContainerStatus: m.containerStatus }));
 import { InstagramContainerError } from '../../../../lib/instagram-container';
 import { MetaApiError } from '@/lib/meta-api';
 import { inspectFacebookInstagramAction, publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction, reconcileInstagramPublicationAction, resumeInstagramPublicationAction } from './actions';
@@ -28,6 +28,7 @@ beforeEach(() => {
   m.product.mockResolvedValue({ id: 'product', affiliateUrl: 'https://example.org/product', primaryImageUrl: 'https://example.org/image.jpg' });
   m.active.mockResolvedValue(null); m.draft.mockResolvedValue({ id: 'draft', caption: 'Product' });
   m.create.mockResolvedValue({ id: 'publication' }); m.update.mockResolvedValue({});
+  m.containerStatus.mockResolvedValue('FINISHED');
   m.transaction.mockImplementation(fn => fn({ $queryRaw: m.lock, product: { findUniqueOrThrow: m.product }, publication: { findFirst: m.active, create: m.create, findMany: m.list, update: m.update }, contentDraft: { findFirst: m.draft }, systemLog: { create: m.audit } }));
   m.meta.mockResolvedValueOnce({ id: '111' }).mockResolvedValueOnce({ id: '222' });
   m.list.mockResolvedValue([{ id: 'publication', externalMediaId: '222' }]);
@@ -357,6 +358,7 @@ it('resumes a pending publication with the existing container instead of creatin
     id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
     lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0),
   });
+  m.containerStatus.mockResolvedValue('IN_PROGRESS');
   m.meta.mockReset().mockResolvedValueOnce({ id: '222' });
   expect(await resumeInstagramPublicationAction('product', 'publication')).toMatchObject({
     success: true, externalMediaId: '222',
@@ -370,6 +372,19 @@ it('resumes a pending publication with the existing container instead of creatin
   );
   expect(m.meta.mock.calls[0][2].body.get('creation_id')).toBe('111');
   expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PUBLISHED', externalMediaId: '222' }) }));
+});
+it('reconciles a container that Meta reports as already published without publishing again', async () => {
+  m.active.mockResolvedValue({
+    id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
+    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0),
+  });
+  m.containerStatus.mockResolvedValue('PUBLISHED');
+  expect(await resumeInstagramPublicationAction('product', 'publication')).toMatchObject({ success: true, externalMediaId: null });
+  expect(m.meta).not.toHaveBeenCalled();
+  expect(m.wait).not.toHaveBeenCalled();
+  expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+    status: 'PUBLISHED', lastErrorCode: 'PUBLISHED_ID_MISSING',
+  }) }));
 });
 it('keeps the existing container pending when a resumed publish still returns 9007', async () => {
   m.active.mockResolvedValue({

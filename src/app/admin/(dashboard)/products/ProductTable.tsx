@@ -10,7 +10,7 @@ import { unpublishFromInstagramAction } from './actions';
 import { enqueueInstagramProductsAction } from './queue-actions';
 import ProductPreviewModal from './ProductPreviewModal';
 import type { ProductSort, SortDirection } from '@/lib/product-list';
-import { formatProductCreation, paginationPages } from '@/lib/product-table-display';
+import { formatProductCreation, paginationPages, productInstagramState } from '@/lib/product-table-display';
 
 export type ProductData = {
   id: string;
@@ -144,7 +144,9 @@ export default function ProductTable({ products, total, page, totalPages, search
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-              {products.map(product => (
+              {products.map(product => {
+                const instagramState = productInstagramState(product);
+                return (
                 <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-3 py-2">
                     <input 
@@ -181,15 +183,17 @@ export default function ProductTable({ products, total, page, totalPages, search
                     </span>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    {product.isPublished ? (
+                    {instagramState === 'published' ? (
                       <span className="inline-flex items-center gap-1 text-sm font-medium text-pink-600 dark:text-pink-400">
                         <Camera size={16} /> Publicado
                       </span>
-                    ) : product.queueNeedsReview ? (
+                    ) : instagramState === 'review' ? (
                       <span className="text-xs text-amber-600">Revisar intento interrumpido</span>
-                    ) : product.queueStatus === 'STARTED' ? (
+                    ) : instagramState === 'processing' ? (
                       <span className="text-xs text-blue-600">En cola / procesando</span>
-                    ) : product.queueStatus === 'FAILED' ? (
+                    ) : instagramState === 'reconciliation' ? (
+                      <span className="text-xs text-amber-600">Pendiente de conciliación</span>
+                    ) : instagramState === 'failed' ? (
                       <span className="text-xs text-red-600" title={product.queueError || undefined}>Falló · revisar registro</span>
                     ) : (
                       <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
@@ -232,7 +236,8 @@ export default function ProductTable({ products, total, page, totalPages, search
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {products.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">No se encontraron productos.</td>

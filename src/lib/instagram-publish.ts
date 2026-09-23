@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { logSystemEvent } from '@/lib/logger';
 import { MetaApiError, requestMeta } from '@/lib/meta-api';
-import { InstagramContainerError, waitForInstagramContainer } from '@/lib/instagram-container';
+import { getInstagramContainerStatus, InstagramContainerError, waitForInstagramContainer } from '@/lib/instagram-container';
 import { mergeProductImages } from './product-gallery';
 import { buildInstagramImageUrl } from './instagram-image';
 
@@ -149,9 +149,26 @@ export async function resumeInstagramPublication(productId: string, publicationI
 
   let publishAttempted = false;
   let confirmedId: string | undefined;
+  let remotePublished = false;
   try {
     const deadline = Date.now() + 60_000;
-    await waitForInstagramContainer(c.root, c.token, claim.containerId, deadline);
+    const containerStatus = await getInstagramContainerStatus(c.root, c.token, claim.containerId);
+    if (containerStatus === 'PUBLISHED') {
+      remotePublished = true;
+      await prisma.publication.update({ where: { id: claim.id }, data: {
+        status: 'PUBLISHED', publishedAt: new Date(),
+        lastErrorCode: 'PUBLISHED_ID_MISSING',
+        lastErrorMessage: 'Meta confirmó que el contenedor ya fue publicado. Falta recuperar el ID remoto para verificarlo o eliminarlo desde SmartBrew.',
+      } });
+      await logSystemEvent('INFO', 'instagram_publish_resume', 'Meta confirmó que el contenedor pendiente ya estaba publicado.', {
+        productId, publicationId: claim.id, externalContainerId: claim.containerId,
+      });
+      return null;
+    }
+    if (containerStatus === 'ERROR' || containerStatus === 'EXPIRED') {
+      throw new InstagramContainerError(`Instagram informó ${containerStatus} para el contenedor. No se solicitó publicar.`, false);
+    }
+    if (containerStatus === 'IN_PROGRESS') await waitForInstagramContainer(c.root, c.token, claim.containerId, deadline);
     publishAttempted = true;
     confirmedId = mediaId(await requestMeta<{ id: string }>('reintentar publicación del contenedor de Instagram', `${c.root}/${c.accountId}/media_publish`, {
       method: 'POST', signal: AbortSignal.timeout(20_000), headers: { Authorization: `Bearer ${c.token}` },
@@ -169,9 +186,11 @@ export async function resumeInstagramPublication(productId: string, publicationI
     const containerPending = error instanceof InstagramContainerError && error.pending;
     const mediaNotReady = error instanceof MetaApiError && error.code === 9007 && error.subcode === 2207027;
     const retryablePublishFailure = publishAttempted && error instanceof MetaApiError && error.retryable;
-    const uncertain = containerPending || mediaNotReady || retryablePublishFailure || Boolean(confirmedId);
+    const uncertain = containerPending || mediaNotReady || retryablePublishFailure || Boolean(confirmedId) || remotePublished;
     const message = mediaNotReady
       ? 'Meta todavía no permite publicar este contenedor (9007/2207027). Se conserva para volver a intentarlo sin duplicar imágenes.'
+      : remotePublished
+        ? 'Meta confirmó que el contenedor ya fue publicado, pero SmartBrew no pudo guardar la conciliación. No vuelvas a publicar.'
       : uncertain
         ? 'El contenedor existente sigue pendiente. No se creó otro; podés volver a intentar cuando Meta se recupere.'
         : errorMessage(error);

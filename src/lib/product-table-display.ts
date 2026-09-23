@@ -9,3 +9,19 @@ const creationDate = new Intl.DateTimeFormat('es-AR', {
 export function formatProductCreation(value: Date | string): string {
   return creationDate.format(new Date(value));
 }
+
+export type ProductInstagramState = 'published' | 'review' | 'processing' | 'reconciliation' | 'failed' | 'none';
+
+export function productInstagramState(product: {
+  isPublished: boolean;
+  instagramBlocked: boolean;
+  queueStatus?: string | null;
+  queueNeedsReview?: boolean;
+}): ProductInstagramState {
+  if (product.isPublished) return 'published';
+  if (product.queueNeedsReview) return 'review';
+  if (product.queueStatus === 'STARTED') return 'processing';
+  if (product.instagramBlocked) return 'reconciliation';
+  if (product.queueStatus === 'FAILED') return 'failed';
+  return 'none';
+}

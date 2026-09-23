@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { waitForInstagramContainer } from './instagram-container';
+import { getInstagramContainerStatus, waitForInstagramContainer } from './instagram-container';
 import { requestMeta } from './meta-api';
 vi.mock('./meta-api', () => ({ requestMeta: vi.fn() }));
 const meta = vi.mocked(requestMeta);
@@ -44,5 +44,10 @@ it.each(['PUBLISHED', 'UNKNOWN', undefined])('blocks unexpected status %s', asyn
 it('preserves the attempt on lookup failure', async () => {
   meta.mockRejectedValue(Error('timeout'));
   await expect(wait()).rejects.toMatchObject({ pending: true });
+  expect(meta).toHaveBeenCalledTimes(1);
+});
+it.each(['ERROR', 'EXPIRED', 'FINISHED', 'IN_PROGRESS', 'PUBLISHED'] as const)('reads the supported container status %s once', async status_code => {
+  meta.mockResolvedValue({ status_code });
+  await expect(getInstagramContainerStatus('https://graph.instagram.com/v26.0', 'test-token', '111')).resolves.toBe(status_code);
   expect(meta).toHaveBeenCalledTimes(1);
 });

@@ -1,7 +1,24 @@
 import { requestMeta } from './meta-api';
 
+export type InstagramContainerStatus = 'ERROR' | 'EXPIRED' | 'FINISHED' | 'IN_PROGRESS' | 'PUBLISHED';
+
 export class InstagramContainerError extends Error {
   constructor(message: string, readonly pending: boolean) { super(message); }
+}
+
+export async function getInstagramContainerStatus(root: string, token: string, containerId: string) {
+  let data: { status_code?: string; status?: string };
+  try {
+    data = await requestMeta('consultar procesamiento del contenedor de Instagram', `${root}/${containerId}?fields=status_code,status`, {
+      headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(5000),
+    });
+  } catch (error) {
+    throw new InstagramContainerError(`No se pudo confirmar el procesamiento del contenedor. Se conserva para revisión. ${error instanceof Error ? error.message : ''}`, true);
+  }
+  if (['ERROR', 'EXPIRED', 'FINISHED', 'IN_PROGRESS', 'PUBLISHED'].includes(data?.status_code || '')) {
+    return data.status_code as InstagramContainerStatus;
+  }
+  throw new InstagramContainerError('Estado del contenedor inesperado. Se requiere conciliación; no se volverá a publicar automáticamente.', true);
 }
 
 // Bounded wait for a server action. Never hold a database transaction while polling.
