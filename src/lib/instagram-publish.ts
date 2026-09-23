@@ -28,6 +28,25 @@ export function mediaId(data: { id?: unknown; success?: unknown } | null) {
 export function refresh(id: string) {
   revalidatePath('/admin/products'); revalidatePath(`/admin/products/${id}`); revalidatePath('/admin/publications');
 }
+
+type InstagramMedia = { id?: unknown; caption?: unknown; permalink?: unknown; timestamp?: unknown };
+
+async function findPublishedMedia(c: ReturnType<typeof config>, affiliateUrl: string | null, createdAt: Date) {
+  if (!affiliateUrl) return null;
+  const response = await requestMeta<{ data?: InstagramMedia[] }>(
+    'buscar publicación existente en Instagram',
+    `${c.root}/${c.accountId}/media?fields=id,caption,permalink,timestamp&limit=50`,
+    { headers: { Authorization: `Bearer ${c.token}` }, cache: 'no-store', signal: AbortSignal.timeout(10_000) },
+  );
+  const earliestTimestamp = createdAt.getTime() - 5 * 60_000;
+  const candidates = (Array.isArray(response?.data) ? response.data : []).flatMap(media => {
+    const timestamp = typeof media.timestamp === 'string' ? Date.parse(media.timestamp) : Number.NaN;
+    if (typeof media.id !== 'string' || !/^\d+$/.test(media.id) || typeof media.caption !== 'string' ||
+      !media.caption.includes(affiliateUrl) || !Number.isFinite(timestamp) || timestamp < earliestTimestamp) return [];
+    return [{ id: media.id, permalink: typeof media.permalink === 'string' ? media.permalink : null, timestamp }];
+  });
+  return candidates.sort((a, b) => a.timestamp - b.timestamp)[0] || null;
+}
 export async function publishOne(productId: string) {
   const c = config();
   // Serialize durable claims across Vercel instances, without holding a lock during HTTP calls.
@@ -133,6 +152,7 @@ export async function resumeInstagramPublication(productId: string, publicationI
     if (!publication || publication.status !== 'PROCESSING' || !publication.externalContainerId || !/^\d+$/.test(publication.externalContainerId)) {
       throw new PublicationError('No hay un contenedor pendiente válido para continuar. Actualizá la página.');
     }
+    const product = await tx.product.findUniqueOrThrow({ where: { id: productId }, select: { affiliateUrl: true } });
     const resumeIsFresh = publication.lastErrorCode === 'RESUME_IN_PROGRESS' &&
       Date.now() - publication.updatedAt.getTime() < 180_000;
     if (resumeIsFresh) throw new PublicationError('Este contenedor ya se está reintentando. Esperá unos minutos y actualizá la página.');
@@ -144,7 +164,7 @@ export async function resumeInstagramPublication(productId: string, publicationI
       lastErrorMessage: 'Reintentando la publicación con el contenedor existente; no se creó contenido nuevo.',
       attemptCount: { increment: 1 },
     } });
-    return { id: publication.id, containerId: publication.externalContainerId };
+    return { id: publication.id, containerId: publication.externalContainerId, createdAt: publication.createdAt, affiliateUrl: product.affiliateUrl };
   });
 
   let publishAttempted = false;
@@ -153,6 +173,22 @@ export async function resumeInstagramPublication(productId: string, publicationI
   try {
     const deadline = Date.now() + 60_000;
     const containerStatus = await getInstagramContainerStatus(c.root, c.token, claim.containerId);
+    if (containerStatus === 'PUBLISHED' || containerStatus === 'ERROR') {
+      let existingMedia: Awaited<ReturnType<typeof findPublishedMedia>> = null;
+      try { existingMedia = await findPublishedMedia(c, claim.affiliateUrl, claim.createdAt); }
+      catch { /* Fall back to the authoritative container status below. */ }
+      if (existingMedia) {
+        remotePublished = true;
+        await prisma.publication.update({ where: { id: claim.id }, data: {
+          status: 'PUBLISHED', publishedAt: new Date(existingMedia.timestamp), externalMediaId: existingMedia.id,
+          externalPermalink: existingMedia.permalink, lastErrorCode: null, lastErrorMessage: null,
+        } });
+        await logSystemEvent('INFO', 'instagram_publish_resume', 'Publicación existente localizada en el feed de Instagram y conciliada.', {
+          productId, publicationId: claim.id, externalContainerId: claim.containerId, externalMediaId: existingMedia.id,
+        });
+        return existingMedia.id;
+      }
+    }
     if (containerStatus === 'PUBLISHED') {
       remotePublished = true;
       await prisma.publication.update({ where: { id: claim.id }, data: {

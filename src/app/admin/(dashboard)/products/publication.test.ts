@@ -356,7 +356,7 @@ it('keeps the same container blocked if Meta still returns 9007 after FINISHED',
 it('resumes a pending publication with the existing container instead of creating another', async () => {
   m.active.mockResolvedValue({
     id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
-    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0),
+    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0), createdAt: new Date(0),
   });
   m.containerStatus.mockResolvedValue('IN_PROGRESS');
   m.meta.mockReset().mockResolvedValueOnce({ id: '222' });
@@ -376,20 +376,42 @@ it('resumes a pending publication with the existing container instead of creatin
 it('reconciles a container that Meta reports as already published without publishing again', async () => {
   m.active.mockResolvedValue({
     id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
-    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0),
+    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0), createdAt: new Date(0),
   });
   m.containerStatus.mockResolvedValue('PUBLISHED');
+  m.meta.mockReset().mockResolvedValue({ data: [] });
   expect(await resumeInstagramPublicationAction('product', 'publication')).toMatchObject({ success: true, externalMediaId: null });
-  expect(m.meta).not.toHaveBeenCalled();
+  expect(m.meta).toHaveBeenCalledTimes(1);
   expect(m.wait).not.toHaveBeenCalled();
   expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
     status: 'PUBLISHED', lastErrorCode: 'PUBLISHED_ID_MISSING',
   }) }));
 });
+it('reconciles an ERROR container from the matching published feed item', async () => {
+  m.active.mockResolvedValue({
+    id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
+    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0), createdAt: new Date('2026-09-23T10:00:00Z'),
+  });
+  m.containerStatus.mockResolvedValue('ERROR');
+  m.meta.mockReset().mockResolvedValue({ data: [{
+    id: '333', caption: 'Producto\n\nLink: https://example.org/product',
+    permalink: 'https://www.instagram.com/p/example/', timestamp: '2026-09-23T10:01:00Z',
+  }] });
+  expect(await resumeInstagramPublicationAction('product', 'publication')).toMatchObject({ success: true, externalMediaId: '333' });
+  expect(m.meta).toHaveBeenCalledWith(
+    'buscar publicación existente en Instagram',
+    'https://graph.instagram.com/v21.0/123/media?fields=id,caption,permalink,timestamp&limit=50',
+    expect.objectContaining({ cache: 'no-store' }),
+  );
+  expect(m.meta.mock.calls.some(call => call[1].endsWith('/media_publish'))).toBe(false);
+  expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+    status: 'PUBLISHED', externalMediaId: '333', externalPermalink: 'https://www.instagram.com/p/example/',
+  }) }));
+});
 it('keeps the existing container pending when a resumed publish still returns 9007', async () => {
   m.active.mockResolvedValue({
     id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
-    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0),
+    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0), createdAt: new Date(0),
   });
   m.meta.mockReset().mockRejectedValueOnce(new MetaApiError({
     operation: 'publish', status: 400, message: 'Not ready', error: { code: 9007, error_subcode: 2207027 },
