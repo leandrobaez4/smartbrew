@@ -12,7 +12,7 @@ vi.mock('@/lib/meta-api', async () => ({ ...await import('../../../../lib/meta-a
 vi.mock('@/lib/instagram-container', async () => ({ ...await import('../../../../lib/instagram-container'), waitForInstagramContainer: m.wait }));
 import { InstagramContainerError } from '../../../../lib/instagram-container';
 import { MetaApiError } from '@/lib/meta-api';
-import { inspectFacebookInstagramAction, publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction, reconcileInstagramPublicationAction } from './actions';
+import { inspectFacebookInstagramAction, publishToInstagramAction, unpublishFromInstagramAction, verifyInstagramPublicationAction, reconcileInstagramPublicationAction, resumeInstagramPublicationAction } from './actions';
 import { runPublicationAction } from '../../../../lib/publication-client';
 
 beforeEach(() => {
@@ -351,4 +351,37 @@ it('keeps the same container blocked if Meta still returns 9007 after FINISHED',
   expect((await publishToInstagramAction(['product'])).success).toBe(false);
   expect(m.create).toHaveBeenCalledTimes(1);
   expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PROCESSING', lastErrorCode: 'RECONCILIATION_REQUIRED' }) }));
+});
+it('resumes a pending publication with the existing container instead of creating another', async () => {
+  m.active.mockResolvedValue({
+    id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
+    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0),
+  });
+  m.meta.mockReset().mockResolvedValueOnce({ id: '222' });
+  expect(await resumeInstagramPublicationAction('product', 'publication')).toMatchObject({
+    success: true, externalMediaId: '222',
+  });
+  expect(m.create).not.toHaveBeenCalled();
+  expect(m.wait).toHaveBeenCalledWith('https://graph.instagram.com/v21.0', 'test-token', '111', expect.any(Number));
+  expect(m.meta).toHaveBeenCalledWith(
+    'reintentar publicación del contenedor de Instagram',
+    'https://graph.instagram.com/v21.0/123/media_publish',
+    expect.objectContaining({ body: expect.any(URLSearchParams) }),
+  );
+  expect(m.meta.mock.calls[0][2].body.get('creation_id')).toBe('111');
+  expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PUBLISHED', externalMediaId: '222' }) }));
+});
+it('keeps the existing container pending when a resumed publish still returns 9007', async () => {
+  m.active.mockResolvedValue({
+    id: 'publication', status: 'PROCESSING', externalContainerId: '111', externalMediaId: null,
+    lastErrorCode: 'RECONCILIATION_REQUIRED', updatedAt: new Date(0),
+  });
+  m.meta.mockReset().mockRejectedValueOnce(new MetaApiError({
+    operation: 'publish', status: 400, message: 'Not ready', error: { code: 9007, error_subcode: 2207027 },
+  }));
+  expect(await resumeInstagramPublicationAction('product', 'publication')).toMatchObject({ success: false });
+  expect(m.create).not.toHaveBeenCalled();
+  expect(m.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+    status: 'PROCESSING', lastErrorCode: 'RECONCILIATION_REQUIRED',
+  }) }));
 });

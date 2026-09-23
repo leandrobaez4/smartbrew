@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/session';
 import { logSystemEvent } from '@/lib/logger';
 import { MetaApiError, requestMeta } from '@/lib/meta-api';
-import { PublicationError, errorMessage, config, mediaId, refresh, publishOne } from '@/lib/instagram-publish';
+import { PublicationError, errorMessage, config, mediaId, refresh, publishOne, resumeInstagramPublication } from '@/lib/instagram-publish';
 
 const prisma = new PrismaClient();
 async function requireAdmin() {
@@ -18,6 +18,18 @@ export async function publishToInstagramAction(productIds: string[]) {
     for (const id of new Set(productIds)) { await publishOne(id); published++; }
     return { success: true, published, message: `${published} producto(s) confirmado(s) por Instagram.` };
   } catch (error) { return { success: false, published, message: `${published ? `${published} producto(s) publicado(s) antes del error. ` : ''}${errorMessage(error)}` }; }
+}
+export async function resumeInstagramPublicationAction(productId: string, publicationId: string) {
+  try {
+    await requireAdmin();
+    if (![productId, publicationId].every(id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(id))) {
+      throw new PublicationError('Producto o publicación inválidos.');
+    }
+    const externalMediaId = await resumeInstagramPublication(productId, publicationId);
+    return { success: true, message: 'Instagram confirmó la publicación pendiente.', externalMediaId };
+  } catch (error) {
+    return { success: false, message: errorMessage(error) };
+  }
 }
 function deletionConfig() {
   const token = process.env.INSTAGRAM_DELETE_FACEBOOK_ACCESS_TOKEN;

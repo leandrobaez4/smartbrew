@@ -49,7 +49,7 @@ export class MetaApiError extends Error {
   }
 
   get retryable() {
-    return this.status === null || this.isTransient === true || this.status === 429 || this.status >= 500;
+    return this.status === null || this.isTransient === true || this.code === 4 || this.status === 429 || this.status >= 500;
   }
 }
 

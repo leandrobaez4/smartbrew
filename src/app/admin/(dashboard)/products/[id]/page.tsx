@@ -11,6 +11,7 @@ import BackButton from './BackButton';
 import InstagramReconciliation from './InstagramReconciliation';
 import FacebookInstagramVerification from './FacebookInstagramVerification';
 import RegenerateEditorialButton from './RegenerateEditorialButton';
+import InstagramPublicationRecovery from './InstagramPublicationRecovery';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +68,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <RegenerateEditorialButton productId={product.id} aiStatus={product.aiStatus} aiError={product.aiError} />
           
           <InstagramPublishButton productId={product.id} isPublished={isPublished} blocked={instagramBlocked} canPublish={Boolean(product.affiliateUrl && product.primaryImageUrl)} />
+          {product.drafts.flatMap(d => d.publications).filter(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PROCESSING' && !pub.deletedAt && pub.externalContainerId).map(pub => (
+            <InstagramPublicationRecovery key={pub.id} productId={product.id} publicationId={pub.id} containerId={pub.externalContainerId!} message={pub.lastErrorMessage} />
+          ))}
           {product.drafts.flatMap(d => d.publications).filter(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PUBLISHED' && !pub.deletedAt).map(pub => (
             <InstagramReconciliation key={pub.id} productId={product.id} publicationId={pub.id} mediaId={pub.externalMediaId} />
           ))}

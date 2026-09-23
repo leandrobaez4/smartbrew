@@ -43,6 +43,17 @@ describe('Meta API diagnostics', () => {
     expect(getMetaErrorDetails(error)).toMatchObject({ retryable: true, httpStatus: 500, code: 2 });
   });
 
+  it('treats Meta application request limits as retryable even when returned as HTTP 403', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { message: 'Application request limit reached', code: 4, error_subcode: 2207051 },
+    }), { status: 403 })));
+
+    const error = await requestMeta('publicar contenido', 'https://graph.facebook.com/test', {})
+      .catch(caught => caught);
+
+    expect(getMetaErrorDetails(error)).toMatchObject({ retryable: true, httpStatus: 403, code: 4, subcode: 2207051 });
+  });
+
   it('wraps network failures without exposing request credentials', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('socket timeout')));
 

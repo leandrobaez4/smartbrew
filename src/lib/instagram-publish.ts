@@ -121,3 +121,71 @@ export async function publishOne(productId: string) {
     throw new PublicationError(message);
   } finally { refresh(productId); }
 }
+
+export async function resumeInstagramPublication(productId: string, publicationId: string) {
+  const c = config();
+  const claim = await prisma.$transaction(async tx => {
+    const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`;
+    if (!rows.length) throw new PublicationError('Producto no encontrado.');
+    const publication = await tx.publication.findFirst({ where: {
+      id: publicationId, draft: { productId }, platform: 'INSTAGRAM', deletedAt: null,
+    } });
+    if (!publication || publication.status !== 'PROCESSING' || !publication.externalContainerId || !/^\d+$/.test(publication.externalContainerId)) {
+      throw new PublicationError('No hay un contenedor pendiente válido para continuar. Actualizá la página.');
+    }
+    const resumeIsFresh = publication.lastErrorCode === 'RESUME_IN_PROGRESS' &&
+      Date.now() - publication.updatedAt.getTime() < 180_000;
+    if (resumeIsFresh) throw new PublicationError('Este contenedor ya se está reintentando. Esperá unos minutos y actualizá la página.');
+    if (!['RECONCILIATION_REQUIRED', 'RESUME_IN_PROGRESS'].includes(publication.lastErrorCode || '')) {
+      throw new PublicationError('El estado de la publicación cambió. Actualizá la página antes de continuar.');
+    }
+    await tx.publication.update({ where: { id: publication.id }, data: {
+      lastErrorCode: 'RESUME_IN_PROGRESS',
+      lastErrorMessage: 'Reintentando la publicación con el contenedor existente; no se creó contenido nuevo.',
+      attemptCount: { increment: 1 },
+    } });
+    return { id: publication.id, containerId: publication.externalContainerId };
+  });
+
+  let publishAttempted = false;
+  let confirmedId: string | undefined;
+  try {
+    const deadline = Date.now() + 60_000;
+    await waitForInstagramContainer(c.root, c.token, claim.containerId, deadline);
+    publishAttempted = true;
+    confirmedId = mediaId(await requestMeta<{ id: string }>('reintentar publicación del contenedor de Instagram', `${c.root}/${c.accountId}/media_publish`, {
+      method: 'POST', signal: AbortSignal.timeout(20_000), headers: { Authorization: `Bearer ${c.token}` },
+      body: new URLSearchParams({ creation_id: claim.containerId }),
+    }));
+    await prisma.publication.update({ where: { id: claim.id }, data: {
+      status: 'PUBLISHED', publishedAt: new Date(), externalMediaId: confirmedId,
+      lastErrorCode: null, lastErrorMessage: null,
+    } });
+    await logSystemEvent('INFO', 'instagram_publish_resume', 'Publicación pendiente confirmada usando el contenedor existente.', {
+      productId, publicationId: claim.id, externalContainerId: claim.containerId, externalMediaId: confirmedId,
+    });
+    return confirmedId;
+  } catch (error) {
+    const containerPending = error instanceof InstagramContainerError && error.pending;
+    const mediaNotReady = error instanceof MetaApiError && error.code === 9007 && error.subcode === 2207027;
+    const retryablePublishFailure = publishAttempted && error instanceof MetaApiError && error.retryable;
+    const uncertain = containerPending || mediaNotReady || retryablePublishFailure || Boolean(confirmedId);
+    const message = mediaNotReady
+      ? 'Meta todavía no permite publicar este contenedor (9007/2207027). Se conserva para volver a intentarlo sin duplicar imágenes.'
+      : uncertain
+        ? 'El contenedor existente sigue pendiente. No se creó otro; podés volver a intentar cuando Meta se recupere.'
+        : errorMessage(error);
+    try {
+      await prisma.publication.update({ where: { id: claim.id }, data: {
+        status: uncertain ? 'PROCESSING' : 'FAILED',
+        lastErrorCode: uncertain ? 'RECONCILIATION_REQUIRED' : 'META_REJECTED',
+        lastErrorMessage: message,
+        ...(confirmedId ? { externalMediaId: confirmedId } : {}),
+      } });
+    } catch { /* Keep the durable claim blocking after a database outage. */ }
+    await logSystemEvent('ERROR', 'instagram_publish_resume', message, {
+      productId, publicationId: claim.id, externalContainerId: claim.containerId, externalMediaId: confirmedId,
+    });
+    throw new PublicationError(message);
+  } finally { refresh(productId); }
+}
