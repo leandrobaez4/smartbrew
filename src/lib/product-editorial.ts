@@ -1,8 +1,9 @@
 import OpenAI from 'openai';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_SLUGS } from './product-categories';
 
-const categorySchema = z.enum(['cafe', 'tecnologia', 'gadgets', 'smart-home', 'home-office']);
+const categorySchema = z.enum(PRODUCT_CATEGORY_SLUGS);
 
 export const ProductEditorialSchema = z.object({
   displayTitle: z.string().trim().min(3).max(80),
@@ -29,6 +30,10 @@ export type ProductEditorialInput = {
 };
 
 export function productEditorialPrompt(input: ProductEditorialInput) {
+  const categoryOptions = PRODUCT_CATEGORIES
+    .map(({ slug, name, description }) => `- ${slug} (${name}): ${description}`)
+    .join('\n');
+
   return `Sos el editor de productos de SmartBrew, una marca de recomendaciones de tecnología, café, gadgets y productos para mejorar el día a día.
 
 Convertí exclusivamente la información real recibida en una ficha editorial clara, útil y confiable.
@@ -40,7 +45,11 @@ IMPORTANTE:
 - No inventes valoraciones, popularidad, ventas ni reseñas.
 - Evitá “el mejor”, “perfecto”, “imperdible” y “garantizado”.
 - Escribí en español natural, claro, moderno y sin lenguaje de vendedor agresivo.
+- Elegí exactamente una categoría de la lista disponible según el título, la categoría de Mercado Libre, los atributos y la descripción. Usá el slug tal como aparece y no inventes categorías nuevas.
 - Devolvé exclusivamente JSON válido.
+
+Categorías disponibles:
+${categoryOptions}
 
 Producto:
 ${JSON.stringify(input)}
@@ -55,7 +64,7 @@ Formato:
   "highlights": ["3 a 6 características reales"],
   "seoTitle": "máximo aproximado 60 caracteres",
   "seoDescription": "aproximadamente 140 a 160 caracteres",
-  "suggestedCategory": "cafe | tecnologia | gadgets | smart-home | home-office",
+  "suggestedCategory": "${PRODUCT_CATEGORY_SLUGS.join(' | ')}",
   "suggestedTags": ["2 a 6 tags"]
 }`;
 }

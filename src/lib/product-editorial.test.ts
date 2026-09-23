@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { ProductEditorialSchema, productEditorialPrompt } from './product-editorial';
+import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_SLUGS } from './product-categories';
 
 const valid = {
   displayTitle: 'Cafetera Modelo X de 20 bares',
@@ -23,9 +24,18 @@ it('rejects unsupported categories and invented extra fields', () => {
   expect(() => ProductEditorialSchema.parse({ ...valid, rating: 5 })).toThrow();
 });
 
-it('builds a prompt that explicitly prohibits false reviews and product claims', () => {
+it.each(PRODUCT_CATEGORY_SLUGS)('accepts the canonical category %s', (suggestedCategory) => {
+  expect(ProductEditorialSchema.parse({ ...valid, suggestedCategory }).suggestedCategory).toBe(suggestedCategory);
+});
+
+it('builds a prompt that prohibits false claims and lists every canonical category', () => {
   const prompt = productEditorialPrompt({ title: 'Producto real' });
   expect(prompt).toContain('No inventes especificaciones');
   expect(prompt).toContain('No afirmes que SmartBrew probó');
+  expect(prompt).toContain('Elegí exactamente una categoría');
+  for (const category of PRODUCT_CATEGORIES) {
+    expect(prompt).toContain(`- ${category.slug} (${category.name}): ${category.description}`);
+  }
+  expect(prompt).toContain(`"suggestedCategory": "${PRODUCT_CATEGORY_SLUGS.join(' | ')}"`);
   expect(prompt).toContain('Producto real');
 });

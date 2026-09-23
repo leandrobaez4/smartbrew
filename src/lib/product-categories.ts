@@ -28,6 +28,10 @@ export const PRODUCT_CATEGORIES = [
 
 export type ProductCategorySlug = typeof PRODUCT_CATEGORIES[number]['slug'];
 
+export const PRODUCT_CATEGORY_SLUGS = PRODUCT_CATEGORIES.map(
+  ({ slug }) => slug
+) as [ProductCategorySlug, ...ProductCategorySlug[]];
+
 export function getProductCategory(slug: string) {
   return PRODUCT_CATEGORIES.find((category) => category.slug === slug);
 }
