@@ -19,6 +19,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv('INSTAGRAM_ACCESS_TOKEN', 'test-token'); vi.stubEnv('INSTAGRAM_ACCOUNT_ID', '123');
   vi.stubEnv('META_GRAPH_API_BASE_URL', 'https://graph.instagram.com'); vi.stubEnv('META_GRAPH_API_VERSION', 'v21.0');
+  vi.stubEnv('APP_URL', 'https://www.smartbrew.tech'); vi.stubEnv('INSTAGRAM_IMAGE_ALLOWED_HOSTS', 'example.org');
   vi.stubEnv('INSTAGRAM_DELETE_FACEBOOK_ACCESS_TOKEN', '');
   vi.stubEnv('INSTAGRAM_DELETE_FACEBOOK_ACCOUNT_ID', '');
   vi.stubEnv('INSTAGRAM_DELETE_GRAPH_API_VERSION', 'v26.0');
@@ -42,7 +43,10 @@ it('publishes all unique images as one ordered carousel, with caption on the par
     const body = m.meta.mock.calls[index][2].body;
     expect(body.get('is_carousel_item')).toBe('true');
     expect(body.has('caption')).toBe(false);
-    expect(body.get('image_url')).toBe(`https://example.org/${['a', 'b', 'c'][index]}.jpg`);
+    const imageUrl = new URL(body.get('image_url'));
+    expect(`${imageUrl.origin}${imageUrl.pathname}`).toBe('https://www.smartbrew.tech/api/media/instagram-image');
+    expect(imageUrl.searchParams.get('url')).toBe(`https://example.org/${['a', 'b', 'c'][index]}.jpg`);
+    expect(imageUrl.searchParams.get('sig')).toMatch(/^[a-f0-9]{64}$/);
   }
   const parent = m.meta.mock.calls[3][2].body;
   expect(parent.get('media_type')).toBe('CAROUSEL');

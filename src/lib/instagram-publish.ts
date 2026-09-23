@@ -4,6 +4,7 @@ import { logSystemEvent } from '@/lib/logger';
 import { MetaApiError, requestMeta } from '@/lib/meta-api';
 import { InstagramContainerError, waitForInstagramContainer } from '@/lib/instagram-container';
 import { mergeProductImages } from './product-gallery';
+import { buildInstagramImageUrl } from './instagram-image';
 
 const prisma = new PrismaClient();
 export class PublicationError extends Error {}
@@ -14,9 +15,11 @@ export function config() {
   const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
   const base = (process.env.META_GRAPH_API_BASE_URL || 'https://graph.instagram.com').replace(/\/$/, '');
   const version = process.env.META_GRAPH_API_VERSION || 'v21.0';
-  if (!token || !accountId) throw new PublicationError('Faltan las credenciales de Instagram del servidor.');
+  const appUrl = process.env.APP_URL;
+  if (!token || !accountId || !appUrl) throw new PublicationError('Faltan las credenciales de Instagram o APP_URL en el servidor.');
   if (!['https://graph.instagram.com', 'https://graph.facebook.com'].includes(base) || !/^v\d+\.0$/.test(version) || !/^\d+$/.test(accountId)) throw new PublicationError('Configuración de Instagram inválida.');
-  return { token, accountId, root: `${base}/${version}` };
+  if (new URL(appUrl).protocol !== 'https:') throw new PublicationError('APP_URL debe usar HTTPS para publicar imágenes en Instagram.');
+  return { token, accountId, appUrl, imageSecret: process.env.INSTAGRAM_IMAGE_PROXY_SECRET || token, root: `${base}/${version}` };
 }
 export function mediaId(data: { id?: unknown; success?: unknown } | null) {
   if (!data || data.success === false || typeof data.id !== 'string' || !/^\d+$/.test(data.id)) throw new PublicationError('Instagram no confirmó un ID válido. No se considera publicado.');
@@ -53,7 +56,13 @@ export async function publishOne(productId: string) {
     if (!caption.includes(commentPrompt)) caption += `\n\n${commentPrompt}`;
     if (!caption.includes(product.affiliateUrl)) caption += `\n\nLink: ${product.affiliateUrl}`;
     const publication = await tx.publication.create({ data: { contentDraftId: draft.id, platform: 'INSTAGRAM', status: 'UPLOADING', attemptCount: 1 } });
-    return { id: publication.id, images, caption };
+    return { id: publication.id, images: images.map((image) => {
+      try {
+        return buildInstagramImageUrl(image, c.appUrl, c.imageSecret);
+      } catch (error) {
+        throw new PublicationError(error instanceof Error ? error.message : 'No se pudo preparar la imagen para Instagram.');
+      }
+    }), caption };
   });
   let publishAttempted = false;
   let confirmedId: string | undefined;

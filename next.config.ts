@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     "cheerio",
     "puppeteer-extra",
     "puppeteer-extra-plugin-stealth",
+    "sharp",
   ],
   experimental: {
     serverActions: {
