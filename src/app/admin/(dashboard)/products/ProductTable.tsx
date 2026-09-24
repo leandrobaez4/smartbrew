@@ -13,6 +13,7 @@ import type { ProductSort, SortDirection } from '@/lib/product-list';
 import { formatProductCreation, paginationPages, productInstagramState } from '@/lib/product-table-display';
 
 export type ProductData = {
+  category?: string | null;
   id: string;
   title: string;
   externalId: string | null;

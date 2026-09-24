@@ -60,6 +60,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       originalPermalink: p.originalPermalink,
       affiliateUrl: p.affiliateUrl,
       createdAt: p.createdAt,
+      category: p.category,
       queueStatus: jobsByProduct.get(p.id)?.status || null,
       queueError: jobsByProduct.get(p.id)?.errorMessage || null,
       queueNeedsReview: Boolean(jobsByProduct.get(p.id)?.outputJson && jobsByProduct.get(p.id)?.status === 'STARTED' && Date.now() - jobsByProduct.get(p.id)!.startedAt.getTime() > 180000),

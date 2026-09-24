@@ -69,7 +69,7 @@ Formato:
 }`;
 }
 
-function stringAttributes(value: unknown) {
+export function stringAttributes(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const entries = Object.entries(value).flatMap(([key, item]) =>
     typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'

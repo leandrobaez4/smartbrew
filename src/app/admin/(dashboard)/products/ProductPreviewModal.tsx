@@ -22,6 +22,7 @@ import CheckAvailabilityButton from './[id]/CheckAvailabilityButton';
 import AffiliateConfiguration from './AffiliateConfiguration';
 import ProductPublicLink from './ProductPublicLink';
 import ProductAdForm from './ProductAdForm';
+import ProductCategoryButton from './ProductCategoryButton';
 import ProductImageEditor from './ProductImageEditor';
 import { safeAffiliateUrl } from '@/lib/product-url';
 import { 
@@ -154,6 +155,7 @@ export default function ProductPreviewModal({ product, fromUrl, onClose }: Produ
 
           <ProductPublicLink productId={product.id} available={product.status === 'ACTIVE' && Boolean(safeAffiliateUrl(product.affiliateUrl))} />
           <ProductAdForm productId={product.id} />
+          <ProductCategoryButton productId={product.id} category={product.category} />
           {/* Link de Afiliado */}
           <div className="bg-gray-50 dark:bg-gray-800/50 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">

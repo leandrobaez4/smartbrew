@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import AffiliateConfiguration from '../AffiliateConfiguration';
 import ProductPublicLink from '../ProductPublicLink';
 import ProductAdForm from '../ProductAdForm';
+import ProductCategoryButton from '../ProductCategoryButton';
 import ProductImageEditor from '../ProductImageEditor';
 import { safeAffiliateUrl } from '@/lib/product-url';
 import CheckAvailabilityButton from './CheckAvailabilityButton';
@@ -66,6 +67,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
           <CheckAvailabilityButton productId={product.id} externalId={product.externalId || ''} />
           <RegenerateEditorialButton productId={product.id} aiStatus={product.aiStatus} aiError={product.aiError} />
+          <ProductCategoryButton productId={product.id} category={product.category} />
           
           <InstagramPublishButton productId={product.id} isPublished={isPublished} blocked={instagramBlocked} canPublish={Boolean(product.affiliateUrl && product.primaryImageUrl)} />
           {product.drafts.flatMap(d => d.publications).filter(pub => pub.platform === 'INSTAGRAM' && pub.status === 'PROCESSING' && !pub.deletedAt && pub.externalContainerId).map(pub => (

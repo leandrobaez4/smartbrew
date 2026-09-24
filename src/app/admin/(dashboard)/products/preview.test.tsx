@@ -6,6 +6,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('./actions', () => ({ publishToInstagramAction: vi.fn(), unpublishFromInstagramAction: vi.fn(), verifyInstagramPublicationAction: vi.fn(), updateProductStatusAction: vi.fn(), reconcileInstagramPublicationAction: vi.fn(), inspectFacebookInstagramAction: vi.fn() }));
 vi.mock('./affiliate-actions', () => ({ updateAffiliateUrlAction: vi.fn() }));
 vi.mock('./image-actions', () => ({ removeProductImageAction: vi.fn() }));
+vi.mock('./category-actions', () => ({ recalculateProductCategory: vi.fn() }));
 vi.mock('./queue-actions', () => ({ enqueueInstagramProductsAction: vi.fn() }));
 vi.mock('./ad-actions', () => ({ createProductAdAction: vi.fn(), getProductAdState: vi.fn() }));
 vi.mock('@/lib/product-url', async () => await import('../../../../lib/product-url'));
