@@ -8,6 +8,58 @@ const baseUrl = process.env.META_GRAPH_API_BASE_URL || 'https://graph.facebook.c
 const version = process.env.META_GRAPH_API_VERSION || 'v21.0';
 const token = process.env.INSTAGRAM_ACCESS_TOKEN;
 
+type InstagramCommentChange = {
+  value?: {
+    id?: string;
+    text?: string;
+    media?: { id?: string };
+    from?: { id?: string; username?: string };
+  };
+};
+
+type InstagramMessagingItem = {
+  sender?: { id?: string };
+  message?: { text?: string; is_echo?: boolean };
+};
+
+export function instagramCatalogUrl() {
+  return (process.env.INSTAGRAM_CATALOG_URL || 'https://www.smartbrew.tech/productos').replace(/\/+$/, '');
+}
+
+export function instagramProductReply(fromUsername: string, product: { title: string; affiliateUrl: string }) {
+  return `¡Hola @${fromUsername}! 👋\n\nAcá tenés el enlace de afiliado para comprar "${product.title}":\n\n👉 ${product.affiliateUrl}\n\nTambién podés ver todos nuestros productos recomendados y ofertas en:\n\n👉 ${instagramCatalogUrl()}\n\n¡Cualquier duda avisanos!`;
+}
+
+function captionUrls(caption: unknown) {
+  if (typeof caption !== 'string') return [];
+  return (caption.match(/https?:\/\/[^\s]+/g) || []).map(url => url.replace(/[),.;!?]+$/, ''));
+}
+
+async function findProductForMedia(mediaId: string) {
+  const publication = await prisma.publication.findFirst({
+    where: { externalMediaId: mediaId, platform: 'INSTAGRAM' },
+    include: { draft: { include: { product: true } } },
+  });
+  if (publication?.draft?.product) return publication.draft.product;
+
+  // Las publicaciones conciliadas pueden recibir comentarios antes de que el mediaId
+  // quede asociado localmente. En ese caso recuperamos el afiliado desde su caption.
+  if (!token) return null;
+  try {
+    const media = await requestMeta<{ caption?: unknown }>(
+      'obtener publicación de Instagram para resolver el producto',
+      `${baseUrl}/${version}/${mediaId}?fields=caption`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' },
+    );
+    const urls = captionUrls(media?.caption);
+    if (urls.length === 0) return null;
+    return prisma.product.findFirst({ where: { affiliateUrl: { in: urls } } });
+  } catch (error: unknown) {
+    console.warn('[IG Webhook] No se pudo resolver el producto desde el caption:', getMetaErrorDetails(error));
+    return null;
+  }
+}
+
 /**
  * Envía una respuesta privada (Private Reply) por DM a un comentario en Instagram
  */
@@ -84,7 +136,7 @@ export async function sendInstagramPublicCommentReply(commentId: string, text: s
 /**
  * Procesa un comentario recibido en un posteo de Instagram
  */
-export async function processInstagramComment(change: any) {
+export async function processInstagramComment(change: InstagramCommentChange) {
   const comment = change.value;
   if (!comment || !comment.id) return;
 
@@ -111,32 +163,15 @@ export async function processInstagramComment(change: any) {
   let product = null;
 
   if (mediaId) {
-    const publication = await prisma.publication.findFirst({
-      where: {
-        externalMediaId: mediaId,
-        platform: 'INSTAGRAM'
-      },
-      include: {
-        draft: {
-          include: {
-            product: true
-          }
-        }
-      }
-    });
-
-    if (publication && publication.draft?.product) {
-      product = publication.draft.product;
-    }
+    product = await findProductForMedia(mediaId);
   }
 
   // Armamos el mensaje
   let messageText = '';
-  const cleanAppUrl = (process.env.APP_URL || 'https://smartbrew-baez3.vercel.app').replace(/\/+$/, '');
-  const catalogUrl = `${cleanAppUrl}/productos`;
+  const catalogUrl = instagramCatalogUrl();
 
   if (product && product.affiliateUrl) {
-    messageText = `¡Hola @${fromUsername}! 👋\n\nAcá tenés el enlace oficial con descuento para comprar "${product.title}":\n\n👉 ${product.affiliateUrl}\n\n¡Cualquier duda avisanos!`;
+    messageText = instagramProductReply(fromUsername, { title: product.title, affiliateUrl: product.affiliateUrl });
   } else {
     // Si no encontramos el producto específico del posteo, le enviamos el catálogo completo
     messageText = `¡Hola @${fromUsername}! 👋\n\nPodés ver todos nuestros productos recomendados y enlaces de ofertas acá:\n\n👉 ${catalogUrl}\n\n¡Que lo disfrutes!`;
@@ -180,21 +215,19 @@ export async function processInstagramComment(change: any) {
 /**
  * Procesa un mensaje directo (DM) enviado a @smartbrew
  */
-export async function processInstagramDirectMessage(messagingItem: any) {
+export async function processInstagramDirectMessage(messagingItem: InstagramMessagingItem) {
   const senderId = messagingItem.sender?.id;
-  const recipientId = messagingItem.recipient?.id;
   const message = messagingItem.message;
 
   // Ignorar si es un mensaje que enviamos nosotros mismos o un echo
-  if (!message || message.is_echo || senderId === process.env.INSTAGRAM_ACCOUNT_ID) {
+  if (!message || !senderId || message.is_echo || senderId === process.env.INSTAGRAM_ACCOUNT_ID) {
     return;
   }
 
   const messageText = (message.text || '').toLowerCase().trim();
   console.log(`[IG Webhook] DM recibido de ${senderId}: "${messageText}"`);
 
-  const cleanAppUrl = (process.env.APP_URL || 'https://smartbrew-baez3.vercel.app').replace(/\/+$/, '');
-  const catalogUrl = `${cleanAppUrl}/productos`;
+  const catalogUrl = instagramCatalogUrl();
 
   // Intentamos buscar si mencionó alguna palabra clave de un producto activo
   let matchedProduct = null;
@@ -219,7 +252,7 @@ export async function processInstagramDirectMessage(messagingItem: any) {
 
   let replyText = '';
   if (matchedProduct && matchedProduct.affiliateUrl) {
-    replyText = `¡Hola! 👋 Gracias por escribirnos.\n\nAcá tenés el enlace con descuento para "${matchedProduct.title}":\n👉 ${matchedProduct.affiliateUrl}\n\n¡Cualquier consulta estamos a disposición!`;
+    replyText = `¡Hola! 👋 Gracias por escribirnos.\n\nAcá tenés el enlace de afiliado para "${matchedProduct.title}":\n👉 ${matchedProduct.affiliateUrl}\n\nMás productos y ofertas:\n👉 ${catalogUrl}\n\n¡Cualquier consulta estamos a disposición!`;
   } else {
     replyText = `¡Hola! 👋 Gracias por contactarte con SmartBrew.\n\nEncontrá todos los productos, gadgets y ofertas que publicamos acá con sus enlaces oficiales:\n👉 ${catalogUrl}\n\n¡Que tengas un excelente día!`;
   }
