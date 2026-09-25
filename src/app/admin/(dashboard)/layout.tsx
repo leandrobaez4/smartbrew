@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { logoutAction } from '../login/actions';
-import { Camera, Package, FileText, Share2, Layers3 } from 'lucide-react';
+import { Bell, Camera, Package, FileText, Share2, Layers3, Truck, ChartNoAxesCombined, ShoppingCart, Settings } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +19,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/products" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <Package size={20} />
             <span>Productos</span>
+          </Link>
+          <Link href="/admin/suppliers" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <Truck size={20} />
+            <span>Proveedores</span>
+          </Link>
+          <Link href="/dashboard/opportunities" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <ChartNoAxesCombined size={20} />
+            <span>Oportunidades</span>
+          </Link>
+          <Link href="/dashboard/dropshipping" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <ChartNoAxesCombined size={20} />
+            <span>Dashboard Dropshipping</span>
+          </Link>
+          <Link href="/admin/orders" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <ShoppingCart size={20} />
+            <span>Órdenes</span>
+          </Link>
+          <Link href="/dashboard/alerts" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <Bell size={20} />
+            <span>Alertas</span>
+          </Link>
+          <Link href="/admin/settings/dropshipping" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+            <Settings size={20} />
+            <span>Settings / Dropshipping</span>
           </Link>
           <Link href="/admin/collections" className="flex items-center space-x-2 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
             <Layers3 size={20} />

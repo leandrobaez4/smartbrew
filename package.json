@@ -17,6 +17,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "render:sample": "tsx scripts/render-sample.ts",
     "trigger:discovery": "tsx scripts/trigger-discovery.ts",
+    "suppliers:sync": "tsx scripts/sync-suppliers.ts",
+    "marketplace:sync-stock": "tsx scripts/sync-marketplace-stock.ts",
+    "marketplace:sync-prices": "tsx scripts/sync-marketplace-prices.ts",
     "import:html": "tsx scripts/import-html.ts"
   },
   "dependencies": {

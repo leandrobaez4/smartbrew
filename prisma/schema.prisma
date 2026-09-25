@@ -15,6 +15,261 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
+model DropshippingSettings {
+  id                   String   @id @default("global")
+  minimumMargin        Decimal  @default(20)
+  minimumProfit        Decimal  @default(0)
+  minimumStock         Int      @default(1)
+  autoPublish          Boolean  @default(false)
+  autoUpdatePrices     Boolean  @default(false)
+  autoPauseNoStock     Boolean  @default(true)
+  autoSupplierPurchase Boolean  @default(false)
+  priceChangeLimit     Decimal  @default(20)
+  supplierSyncInterval Int      @default(15)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Supplier {
+  id                 String                  @id @default(cuid())
+  name               String
+  slug               String                  @unique
+  type               String?
+  website            String?
+  apiUrl             String?
+  apiKeyEncrypted    String?
+  apiSecretEncrypted String?
+  usernameEncrypted  String?
+  passwordEncrypted  String?
+  status             SupplierStatus          @default(ACTIVE)
+  integrationType    SupplierIntegrationType
+  lastSyncAt         DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  products           SupplierProduct[]
+  orders             Order[]
+
+  @@index([status])
+  @@index([integrationType])
+}
+
+model SupplierProduct {
+  id                    String                         @id @default(cuid())
+  supplierId            String
+  supplier              Supplier                       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  externalId            String
+  sku                   String?
+  ean                   String?
+  title                 String
+  description           String?
+  brand                 String?
+  category              String?
+  cost                  Decimal?
+  currency              String?
+  stock                 Int?
+  images                String[]                       @default([])
+  attributes            Json?
+  rawData               Json
+  editorialTitle        String?
+  editorialDescription  String?
+  editorialBulletPoints Json?
+  editorialHighlights   Json?
+  editorialSeoKeywords  String[]                       @default([])
+  editorialStatus       SupplierProductEditorialStatus @default(PENDING)
+  editorialError        String?
+  editorialGeneratedAt  DateTime?
+  editorialReviewedAt   DateTime?
+  active                Boolean                        @default(true)
+  lastSyncAt            DateTime
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+  listings              MarketplaceListing[]
+  orders                Order[]
+  history               SupplierProductHistory[]
+  pricing               SupplierProductPricing?
+
+  @@unique([supplierId, externalId])
+  @@index([supplierId])
+  @@index([externalId])
+  @@index([sku])
+  @@index([ean])
+  @@index([editorialStatus])
+}
+
+model SupplierProductPricing {
+  id                         String          @id @default(cuid())
+  supplierProductId          String          @unique
+  supplierProduct            SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  supplierPriceUsd           Decimal
+  exchangeRateArsPerUsd      Decimal
+  supplierPriceArs           Decimal
+  vatPercentage              Decimal
+  vatAmountUsd               Decimal
+  vatAmountArs               Decimal
+  supplierCostWithVatUsd     Decimal
+  supplierCostWithVatArs     Decimal
+  productSearchCostArs       Decimal         @default(0)
+  shippingCostArs            Decimal         @default(0)
+  marketplaceFeePercentage   Decimal         @default(0)
+  marketplaceFixedFeeArs     Decimal         @default(0)
+  marketplaceFeeAmountArs    Decimal         @default(0)
+  marketplaceCategoryId      String?
+  marketplaceListingTypeId   String          @default("gold_special")
+  marketplaceFeeSyncedAt     DateTime?
+  targetMarginPercentage     Decimal         @default(20)
+  targetProfitArs            Decimal
+  totalCostArs               Decimal
+  finalPriceArs              Decimal
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+
+  @@index([marketplaceFeeSyncedAt])
+  @@index([marketplaceCategoryId])
+}
+
+model SupplierProductHistory {
+  id                String          @id @default(cuid())
+  supplierProductId String
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  cost              Decimal?
+  stock             Int?
+  createdAt         DateTime        @default(now())
+
+  @@index([supplierProductId, createdAt])
+}
+
+model MarketplaceListing {
+  id                   String                   @id @default(cuid())
+  supplierProductId    String
+  supplierProduct      SupplierProduct          @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  marketplace          String
+  marketplaceItemId    String?
+  marketplaceAccountId String
+  price                Decimal?
+  status               MarketplaceListingStatus @default(DRAFT)
+  publishedAt          DateTime?
+  lastSyncAt           DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  orders               Order[]
+
+  @@unique([supplierProductId, marketplace, marketplaceAccountId])
+  @@unique([marketplace, marketplaceAccountId, marketplaceItemId])
+  @@index([supplierProductId])
+  @@index([marketplaceItemId])
+  @@index([status])
+  @@index([lastSyncAt])
+}
+
+model MarketplaceWebhookEvent {
+  id            String                   @id @default(cuid())
+  eventKey      String                   @unique
+  topic         String
+  resource      String
+  userId        String
+  applicationId String
+  attempts      Int                      @default(1)
+  payload       Json
+  resourceData  Json?
+  status        MarketplaceWebhookStatus @default(RECEIVED)
+  error         String?
+  processedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  @@index([topic])
+  @@index([status])
+}
+
+model Order {
+  id                   String             @id @default(cuid())
+  marketplace          String
+  marketplaceOrderId   String             @unique
+  marketplaceAccountId String
+  supplierId           String
+  supplier             Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierProductId    String
+  supplierProduct      SupplierProduct    @relation(fields: [supplierProductId], references: [id], onDelete: Restrict)
+  listingId            String
+  listing              MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  quantity             Int
+  salePrice            Decimal
+  supplierCost         Decimal
+  marketplaceFee       Decimal            @default(0)
+  shippingCost         Decimal            @default(0)
+  taxes                Decimal            @default(0)
+  profit               Decimal
+  financialsEstimated  Boolean            @default(true)
+  customerData         Json
+  shippingData         Json
+  supplierOrderId      String?
+  supplierResponse     Json?
+  status               OrderStatus        @default(PENDING)
+  paymentStatus        String?
+  shippingStatus       String?
+  currency             String?
+  buyerId              String?
+  rawData              Json
+  orderedAt            DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([supplierId])
+  @@index([supplierProductId])
+  @@index([listingId])
+  @@index([supplierOrderId])
+  @@index([status])
+}
+
+enum MarketplaceListingStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CLOSED
+  ERROR
+}
+
+enum MarketplaceWebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  ERROR
+}
+
+enum OrderStatus {
+  PENDING
+  SUPPLIER_PENDING
+  SUPPLIER_PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  ERROR
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+enum SupplierIntegrationType {
+  API
+  CSV
+  XML
+  MANUAL
+  SCRAPING
+}
+
+enum SupplierProductEditorialStatus {
+  PENDING
+  PROCESSING
+  READY
+  APPROVED
+  REJECTED
+  FAILED
+}
+
 // Invited portal members are deliberately NOT admin Users.
 model PortalMember {
   id              String               @id @default(cuid())
@@ -247,8 +502,12 @@ model JobExecution {
   inputJson    Json?
   outputJson   Json?
   errorMessage String?
+  attemptCount Int       @default(0)
+  maxAttempts  Int       @default(1)
   startedAt    DateTime  @default(now())
   finishedAt   DateTime?
+
+  @@index([status, jobName, startedAt])
 }
 
 enum JobStatus {
@@ -275,4 +534,50 @@ model SystemLog {
   message   String
   details   Json?
   createdAt DateTime @default(now())
+}
+
+model Alert {
+  id         String    @id @default(cuid())
+  type       AlertType
+  origin     String
+  entityType String?
+  entityId   String?
+  message    String
+  details    Json?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([readAt, createdAt])
+  @@index([type, createdAt])
+  @@index([entityType, entityId])
+}
+
+enum AlertType {
+  SUPPLIER_OUT_OF_STOCK
+  SUPPLIER_PRICE_INCREASE
+  LOW_MARGIN
+  PRICE_ANOMALY
+  SUPPLIER_API_ERROR
+  ORDER_CREATION_ERROR
+  MARKETPLACE_SYNC_ERROR
+}
+
+model IntegrationLog {
+  id         String               @id @default(cuid())
+  provider   String
+  operation  String
+  request    Json?
+  response   Json?
+  status     IntegrationLogStatus
+  error      String?
+  durationMs Int
+  createdAt  DateTime             @default(now())
+
+  @@index([provider, operation, createdAt])
+  @@index([status, createdAt])
+}
+
+enum IntegrationLogStatus {
+  SUCCESS
+  ERROR
 }

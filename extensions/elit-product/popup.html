@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>SmartBrew · Elit</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>Extraer producto de Elit</h1>
+  <p>Abrí un producto de Elit y extraé sus datos para revisarlos antes de conectarlos con SmartBrew.</p>
+  <button id="extract" type="button">Extraer este producto</button>
+  <p id="status" role="status" aria-live="polite">Todavía no se extrajeron datos.</p>
+  <label for="result">Datos preparados</label>
+  <textarea id="result" rows="12" readonly placeholder="El JSON aparecerá aquí"></textarea>
+  <button id="copy" class="secondary" type="button" disabled>Copiar JSON</button>
+  <button id="send" class="success" type="button" disabled>Configurar en SmartBrew</button>
+  <p class="note">La extracción sólo lee la pestaña. SmartBrew mostrará todos los cálculos y pedirá confirmación antes de guardar.</p>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

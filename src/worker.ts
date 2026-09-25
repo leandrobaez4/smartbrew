@@ -1,22 +1,48 @@
-import { Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { createProductSlug } from './lib/product-slug';
+import { MercadoLibreClient } from './lib/domain/ml-client';
+import { OpenAICopyGenerator } from './lib/domain/openai-client';
+import { calculateOpportunityScore } from './lib/domain/scoring';
+import { supplierSyncIntervalMs } from './lib/suppliers/sync';
+import { getDropshippingSettings } from './lib/dropshipping-settings';
+import { DropshippingJobName, executeDropshippingJob, optionsForDropshippingJob } from './lib/dropshipping-jobs';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 const prisma = new PrismaClient();
+const queue = new Queue('affiliate-jobs', { connection });
+
+const scheduledDropshippingJobs = [
+  DropshippingJobName.SupplierCatalogSyncJob,
+  DropshippingJobName.SupplierStockSyncJob,
+  DropshippingJobName.SupplierPriceSyncJob,
+  DropshippingJobName.MarketplaceStockSyncJob,
+  DropshippingJobName.MarketplacePriceSyncJob,
+  DropshippingJobName.MarketplaceFeeSyncJob,
+  DropshippingJobName.SupplierOrderStatusSyncJob,
+];
+
+void getDropshippingSettings().then((settings) => Promise.all(scheduledDropshippingJobs.map((name) => queue.upsertJobScheduler(
+  name,
+  { every: supplierSyncIntervalMs(String(settings.supplierSyncInterval)) },
+  { name, data: {}, opts: optionsForDropshippingJob(name) },
+)))).then(() => console.log('Dropshipping schedulers configured.'))
+  .catch((error) => console.error('Failed to configure supplier catalog scheduler:', error));
 
 console.log('Worker connecting to Redis...', redisUrl);
 
 const worker = new Worker('affiliate-jobs', async job => {
   console.log(`Processing job ${job.id} of type ${job.name}`);
+
+  if (Object.values(DropshippingJobName).includes(job.name as DropshippingJobName)) {
+    return executeDropshippingJob(job);
+  }
   
   if (job.name === 'discover-products') {
     console.log('Running real discover products job...');
-    const MLClient = require('./lib/domain/ml-client').MercadoLibreClient;
-    const { calculateOpportunityScore } = require('./lib/domain/scoring');
-    const ml = new MLClient();
+    const ml = new MercadoLibreClient();
     
     // Niche search (e.g., tech gadgets, coffee accessories)
     const keywords = [
@@ -47,7 +73,7 @@ const worker = new Worker('affiliate-jobs', async job => {
       }
       
       // Calculate basic percentiles from the current batch for simulation
-      const prices = results.map((r: any) => r.price || 0).sort((a: number, b: number) => a - b);
+      const prices = results.map((result) => result.price || 0).sort((a, b) => a - b);
       const p35 = prices[Math.floor(prices.length * 0.35)] || 0;
       const p70 = prices[Math.floor(prices.length * 0.70)] || 0;
       
@@ -90,7 +116,7 @@ const worker = new Worker('affiliate-jobs', async job => {
               originalPermalink: item.originalPermalink,
               primaryImageUrl: item.primaryImageUrl,
               imageUrls: item.imageUrls,
-              attributesJson: item.attributesJson,
+              attributesJson: item.attributesJson == null ? Prisma.JsonNull : item.attributesJson,
               sellerId: item.sellerId,
               sellerReputation: item.sellerReputation,
               aiStatus: 'PENDING',
@@ -101,7 +127,7 @@ const worker = new Worker('affiliate-jobs', async job => {
               problemSolved: scoreResult.problemSolved,
               reelHook: scoreResult.reelHook,
               explanationDifficulty: scoreResult.explanationDifficulty,
-              selectionReasons: scoreResult.selectionReasons as any,
+              selectionReasons: scoreResult.selectionReasons as Prisma.InputJsonValue,
               lastMarketplaceSyncAt: new Date()
             },
             create: {
@@ -118,7 +144,7 @@ const worker = new Worker('affiliate-jobs', async job => {
               originalPermalink: item.originalPermalink,
               primaryImageUrl: item.primaryImageUrl,
               imageUrls: item.imageUrls,
-              attributesJson: item.attributesJson,
+              attributesJson: item.attributesJson == null ? Prisma.JsonNull : item.attributesJson,
               sellerId: item.sellerId,
               sellerReputation: item.sellerReputation,
               status: scoreResult.status === 'SELECTED' ? 'ACTIVE' : 'CANDIDATE',
@@ -128,7 +154,7 @@ const worker = new Worker('affiliate-jobs', async job => {
               problemSolved: scoreResult.problemSolved,
               reelHook: scoreResult.reelHook,
               explanationDifficulty: scoreResult.explanationDifficulty,
-              selectionReasons: scoreResult.selectionReasons as any,
+              selectionReasons: scoreResult.selectionReasons as Prisma.InputJsonValue,
               lastMarketplaceSyncAt: new Date()
             }
           });
@@ -156,7 +182,6 @@ const worker = new Worker('affiliate-jobs', async job => {
       
       if (!draft || !draft.product) throw new Error('Draft or Product not found');
       
-      const OpenAICopyGenerator = require('./lib/domain/openai-client').OpenAICopyGenerator;
       const generator = new OpenAICopyGenerator();
       
       const copy = await generator.generate({
@@ -164,6 +189,10 @@ const worker = new Worker('affiliate-jobs', async job => {
         productPrice: draft.product.price ? Number(draft.product.price) : null,
         productCurrency: draft.product.currencyId,
         productAttributes: draft.product.selectionReasons
+          && !Array.isArray(draft.product.selectionReasons)
+          && typeof draft.product.selectionReasons === 'object'
+          ? draft.product.selectionReasons as Record<string, unknown>
+          : null,
       });
       
       await prisma.contentDraft.update({
@@ -179,9 +208,10 @@ const worker = new Worker('affiliate-jobs', async job => {
         }
       });
       console.log(`Copy generated successfully for draft ${draftId}`);
-    } catch (err: any) {
-      console.error('Error generating copy:', err.message);
-      return { success: false, error: err.message };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown copy generation error';
+      console.error('Error generating copy:', message);
+      return { success: false, error: message };
     }
     
     return { success: true };
