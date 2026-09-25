@@ -1,5 +1,9 @@
 import { extractElitProduct } from './extract.mjs';
 
+export function canConfigureProduct(product) {
+  return Boolean(product && typeof product === 'object' && product.externalId && product.title);
+}
+
 export async function withDeadline(promise, milliseconds, message) {
   let timer;
   try {

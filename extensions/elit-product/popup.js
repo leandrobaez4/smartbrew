@@ -1,4 +1,4 @@
-import { extractCurrentProduct } from './run.mjs';
+import { canConfigureProduct, extractCurrentProduct } from './run.mjs';
 
 const extract = document.querySelector('#extract');
 const copy = document.querySelector('#copy');
@@ -26,7 +26,7 @@ extract.addEventListener('click', async () => {
     extractedProduct = response.product;
     status.textContent = response.message;
     copy.disabled = false;
-    send.disabled = !response.product.pricing?.supplierPriceUsd || !response.product.pricing?.exchangeRateArsPerUsd;
+    send.disabled = !canConfigureProduct(response.product);
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : 'No se pudo ejecutar la extensión.';
   } finally {

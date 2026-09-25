@@ -1,8 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractCurrentProduct } from './run.mjs';
+import { canConfigureProduct, extractCurrentProduct } from './run.mjs';
 
 const deadlines = { tab: 10, extraction: 10 };
+
+test('allows configuration when pricing must be completed in SmartBrew', () => {
+  assert.equal(canConfigureProduct({ externalId: '6358', title: 'Auricular', pricing: {
+    supplierPriceUsd: null,
+    exchangeRateArsPerUsd: null,
+  } }), true);
+});
 
 test('extracts from the active Elit product tab and reports both stages', async () => {
   const stages = [];

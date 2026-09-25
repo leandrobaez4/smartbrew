@@ -18,12 +18,8 @@ export default async function ElitImportPage({ searchParams }: {
     <h1 className="text-xl font-bold">No se pudo leer el producto de Elit</h1>
     <p className="mt-2 text-sm">Volvé a la página del producto, recargá la extensión y extraelo nuevamente.</p>
   </main>;
-  if (!product.pricing.supplierPriceUsd || !product.pricing.exchangeRateArsPerUsd) return <main className="mx-auto max-w-3xl rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-950">
-    <h1 className="text-xl font-bold">Faltan el precio o el tipo de cambio</h1>
-    <p className="mt-2 text-sm">Iniciá sesión en Elit para que la página muestre ambos valores y repetí la extracción.</p>
-  </main>;
-
   const save = importElitProductAction.bind(null, payload);
+  const missingPricing = !product.pricing.supplierPriceUsd || !product.pricing.exchangeRateArsPerUsd;
   return <main className="mx-auto max-w-6xl space-y-6">
     <header>
       <p className="text-sm font-semibold text-yellow-600">Dropshipping · Elit</p>
@@ -31,9 +27,12 @@ export default async function ElitImportPage({ searchParams }: {
       <p className="mt-1 text-sm text-gray-500">{product.title} · Código {product.externalId} · SKU {product.sku || '—'}</p>
     </header>
     {query.error && <p className="rounded bg-red-50 p-3 text-sm text-red-800">Revisá los valores del cálculo.</p>}
+    {missingPricing && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+      Elit no informó {product.pricing.supplierPriceUsd ? 'el tipo de cambio' : product.pricing.exchangeRateArsPerUsd ? 'el precio en USD' : 'el precio en USD ni el tipo de cambio'}. Completá el campo marcado en cero para calcular y guardar el producto.
+    </p>}
     <PricingCalculatorForm action={save} initial={{
-      supplierPriceUsd: product.pricing.supplierPriceUsd,
-      exchangeRateArsPerUsd: product.pricing.exchangeRateArsPerUsd,
+      supplierPriceUsd: product.pricing.supplierPriceUsd ?? 0,
+      exchangeRateArsPerUsd: product.pricing.exchangeRateArsPerUsd ?? 0,
       vatPercentage: product.pricing.vatPercentage,
       productSearchCostArs: 0,
       shippingCostArs: 0,

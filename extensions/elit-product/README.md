@@ -10,7 +10,9 @@ La extensión extrae desde la pestaña activa los datos del producto y abre una 
 4. Si tu cuenta de Elit permite ver precio y stock, iniciá sesión antes de extraer.
 5. Abrí la extensión y presioná **Extraer este producto**.
 6. Revisá el JSON y elegí **Configurar en SmartBrew**.
-7. En el dashboard configurá costos, comisión y margen. La base sólo cambia al confirmar el formulario.
+7. En el dashboard completá o corregí precio, cambio, costos, comisión y margen. La base sólo cambia al confirmar el formulario.
+
+El botón **Configurar en SmartBrew** se habilita después de cualquier extracción válida. Si Elit no expone el precio o el tipo de cambio, esos campos se abren en cero para completarlos manualmente en SmartBrew.
 
 El traspaso abre SmartBrew con el producto codificado en la URL. No incluye cookies ni credenciales, pero los datos del producto y su costo pueden quedar visibles en el historial del navegador y en registros de navegación.
 
