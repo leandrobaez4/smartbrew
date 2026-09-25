@@ -37,6 +37,13 @@ it('portal-only visitors cannot administer invitations', async () => {
   mocks.adminSession.mockResolvedValue(null);
   await expect(requireAdmin()).rejects.toThrow('redirect:/admin/login');
 });
+it('preserves a safe admin destination through login', async () => {
+  vi.stubEnv('SESSION_SECRET', 'a'.repeat(32));
+  mocks.adminSession.mockResolvedValue(null);
+  await expect(requireAdmin('/admin/suppliers/elit-import?payload=abc_123')).rejects.toThrow(
+    'redirect:/admin/login?returnTo=%2Fadmin%2Fsuppliers%2Felit-import%3Fpayload%3Dabc_123',
+  );
+});
 it('rejects a signed session for an admin removed from the database', async () => {
   vi.stubEnv('SESSION_SECRET', 'a'.repeat(32));
   mocks.adminSession.mockResolvedValue({ user: { id: 'deleted' } });

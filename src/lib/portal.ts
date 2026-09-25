@@ -3,16 +3,20 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getSession } from './session';
 import { hashSecret, randomSecret } from './portal-crypto';
+import { normalizeAdminReturnTo } from './admin-return-to';
 
 export const portalDb = new PrismaClient();
 const cookieName = 'smartbrew_portal';
 
-export async function requireAdmin() {
+export async function requireAdmin(returnTo?: string) {
   // Never accept the legacy session fallback key for invitation administration.
   if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) throw new Error('Configure SESSION_SECRET');
   const session = await getSession();
   const id = session?.user?.id;
-  if (typeof id !== 'string' || !await portalDb.user.findUnique({ where: { id } })) redirect('/admin/login');
+  if (typeof id !== 'string' || !await portalDb.user.findUnique({ where: { id } })) {
+    const destination = normalizeAdminReturnTo(returnTo);
+    redirect(destination ? `/admin/login?returnTo=${encodeURIComponent(destination)}` : '/admin/login');
+  }
 }
 
 export async function portalSession() {

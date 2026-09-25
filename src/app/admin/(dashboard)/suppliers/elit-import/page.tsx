@@ -8,9 +8,10 @@ export const dynamic = 'force-dynamic';
 export default async function ElitImportPage({ searchParams }: {
   searchParams: Promise<{ payload?: string; error?: string }>;
 }) {
-  await requireAdmin();
   const query = await searchParams;
   const payload = query.payload || '';
+  const returnTo = `/admin/suppliers/elit-import?payload=${encodeURIComponent(payload)}`;
+  await requireAdmin(returnTo);
   const product = decodeElitImportPayload(payload);
 
   if (!product) return <main className="mx-auto max-w-3xl rounded-lg border border-red-200 bg-red-50 p-6 text-red-900">

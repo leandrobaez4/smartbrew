@@ -6,6 +6,7 @@ import { encrypt } from '@/lib/session';
 import { cookies } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { redirect } from 'next/navigation';
+import { normalizeAdminReturnTo } from '@/lib/admin-return-to';
 
 const prisma = new PrismaClient();
 
@@ -36,7 +37,7 @@ export async function loginAction(prevState: { error: string | null }, formData:
   const session = await encrypt({ user: { id: user.id, email: user.email } });
   (await cookies()).set('session', session, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
-  redirect('/admin/products');
+  redirect(normalizeAdminReturnTo(formData.get('returnTo')) || '/admin/products');
 }
 
 export async function logoutAction() {
