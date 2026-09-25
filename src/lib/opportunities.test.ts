@@ -16,14 +16,25 @@ const product = (overrides: Partial<OpportunityProduct> = {}): OpportunityProduc
 });
 
 describe('opportunity dashboard data', () => {
-  it('only includes active supplier products with stock and profitability', () => {
+  it('includes configured products even when stock is zero or unavailable', () => {
     const rows = calculateOpportunities([
       product(),
       product({ id: 'zero-stock', stock: 0 }),
+      product({ id: 'unknown-stock', stock: null }),
       product({ id: 'inactive', supplier: { id: 'supplier-2', name: 'Inactivo', status: 'INACTIVE' } }),
     ], config);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: 'product-1', recommendedPrice: 8_750, estimatedProfit: 1_750, marginPercentage: 20, roi: 25 });
+    expect(rows).toHaveLength(3);
+    expect(rows.find((row) => row.id === 'product-1')).toMatchObject({ recommendedPrice: 8_750, estimatedProfit: 1_750, marginPercentage: 20, roi: 25, stockReported: true });
+    expect(rows.find((row) => row.id === 'unknown-stock')).toMatchObject({ stock: 0, stockReported: false });
+  });
+
+  it('can explicitly filter out products without available stock', () => {
+    const rows = calculateOpportunities([
+      product(),
+      product({ id: 'zero-stock', stock: 0 }),
+      product({ id: 'unknown-stock', stock: null }),
+    ], config, { minimumStock: 1 });
+    expect(rows.map((row) => row.id)).toEqual(['product-1']);
   });
 
   it('filters by supplier, category, margin, maximum cost and minimum stock', () => {

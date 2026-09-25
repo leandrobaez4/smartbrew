@@ -48,7 +48,7 @@ export function calculateOpportunities(
   const rows = products.flatMap((product) => {
     const cost = product.cost;
     const stock = product.stock ?? 0;
-    if (!product.active || product.supplier.status !== 'ACTIVE' || cost == null || cost < 0 || stock <= 0) return [];
+    if (!product.active || product.supplier.status !== 'ACTIVE' || cost == null || cost < 0) return [];
     if (filters.supplierId && product.supplier.id !== filters.supplierId) return [];
     if (filters.category && product.category !== filters.category) return [];
     if (filters.maximumCost != null && cost > filters.maximumCost) return [];
@@ -77,6 +77,7 @@ export function calculateOpportunities(
         ...product,
         cost,
         stock,
+        stockReported: product.stock !== null,
         recommendedPrice: result.recommendedPrice,
         estimatedProfit: result.netProfit,
         marginPercentage: result.marginPercentage,
