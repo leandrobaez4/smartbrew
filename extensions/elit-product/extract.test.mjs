@@ -81,6 +81,21 @@ test('reads the displayed USD exchange rate and IVA when the payload does not ca
   assert.equal(result.product.pricing.supplierCostWithVatArs, 18573.5);
 });
 
+test('reads a split USD product price from the displayed price block', () => {
+  const product = { _id: 'mongo-id', code: 6358, name: 'Auricular', price: null, currentExchange: 1535, media: { images: [] } };
+  page(product);
+  const originalQuery = document.querySelectorAll;
+  document.querySelectorAll = (selector) => selector === 'p'
+    ? [{
+      textContent: 'usd 10,77',
+      querySelector: (childSelector) => childSelector === 'small' ? { textContent: 'usd' } : null,
+    }]
+    : originalQuery(selector);
+  const result = extractElitProduct();
+  assert.equal(result.product.pricing.supplierPriceUsd, 10.77);
+  assert.equal(result.product.pricing.supplierPriceArs, 16531.95);
+});
+
 test('refuses unrelated origins and non-product pages', () => {
   for (const url of ['https://example.com/producto/6358-test', 'https://www.elit.com.ar/', 'https://www.elit.com.ar.evil.test/producto/6358-test']) {
     page({ name: 'Producto' }, { url });

@@ -110,6 +110,16 @@ export function extractElitProduct() {
     return null;
   }
 
+  function supplierPriceUsdFromDom() {
+    for (const paragraph of document.querySelectorAll('p')) {
+      const currency = paragraph.querySelector?.('small');
+      if (cleanText(currency?.textContent).toLowerCase() !== 'usd') continue;
+      const match = cleanText(paragraph.textContent).match(/^usd\s*\$?\s*([\d.,]+)$/i);
+      if (match) return localizedNumber(match[1]);
+    }
+    return null;
+  }
+
   function vatFromDom() {
     for (const element of document.querySelectorAll('p, small')) {
       const match = cleanText(element.textContent).match(/(?:\+\s*)?IVA\s*([\d.,]+)\s*%/i);
@@ -152,7 +162,7 @@ export function extractElitProduct() {
 
   const numericStock = finiteNumber(source?.stockTotal ?? source?.stock);
   const stock = numericStock === null ? null : Math.trunc(numericStock);
-  const supplierPriceUsd = finiteNumber(source?.price);
+  const supplierPriceUsd = finiteNumber(source?.price) ?? supplierPriceUsdFromDom();
   const exchangeRateArsPerUsd = finiteNumber(source?.currentExchange) || exchangeRateFromDom();
   const vatPercentage = finiteNumber(source?.vat) ?? vatFromDom() ?? localizedNumber(fallbackAttributes.IVA) ?? 0;
   const supplierPriceArs = supplierPriceUsd !== null && exchangeRateArsPerUsd !== null

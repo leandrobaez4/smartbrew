@@ -27,7 +27,7 @@ El traspaso abre SmartBrew con el producto codificado en la URL. No incluye cook
 
 ## Datos y permisos
 
-- Extrae código de Elit, SKU, EAN, título, descripción, marca, categoría, precio USD, tipo de cambio, IVA, equivalentes ARS, stock, galería y atributos técnicos.
+- Extrae código de Elit, SKU, EAN, título, descripción, marca, categoría, precio USD, tipo de cambio, IVA, equivalentes ARS, stock, galería y atributos técnicos. Si el precio no aparece en los datos internos, también lee el bloque visual que separa los enteros y centavos del precio en USD.
 - Cuando Elit no expone precio o stock para la sesión actual, devuelve esos campos como `null` y lo informa explícitamente.
 - `activeTab` concede acceso temporal sólo después del clic del usuario.
 - `scripting` ejecuta el extractor empaquetado en contexto aislado.
