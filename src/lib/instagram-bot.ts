@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { logSystemEvent } from '@/lib/logger';
 import { getMetaErrorDetails, requestMeta } from '@/lib/meta-api';
+import { productUrl } from './product-url';
 
 const prisma = new PrismaClient();
 
@@ -26,8 +27,8 @@ export function instagramCatalogUrl() {
   return (process.env.INSTAGRAM_CATALOG_URL || 'https://www.smartbrew.tech/productos').replace(/\/+$/, '');
 }
 
-export function instagramProductReply(fromUsername: string, product: { title: string; affiliateUrl: string }) {
-  return `¡Hola @${fromUsername}! 👋\n\nAcá tenés el enlace de afiliado para comprar "${product.title}":\n\n👉 ${product.affiliateUrl}\n\nTambién podés ver todos nuestros productos recomendados y ofertas en:\n\n👉 ${instagramCatalogUrl()}\n\n¡Cualquier duda avisanos!`;
+export function instagramProductReply(fromUsername: string, product: { id: string; title: string; affiliateUrl: string }) {
+  return `¡Hola @${fromUsername}! 👋\n\nPodés ver "${product.title}" en SmartBrew:\n\n👉 ${productUrl(product.id)}\n\nEnlace de afiliado para comprarlo:\n\n👉 ${product.affiliateUrl}\n\n¡Cualquier duda avisanos!`;
 }
 
 function captionUrls(caption: unknown) {
@@ -171,7 +172,7 @@ export async function processInstagramComment(change: InstagramCommentChange) {
   const catalogUrl = instagramCatalogUrl();
 
   if (product && product.affiliateUrl) {
-    messageText = instagramProductReply(fromUsername, { title: product.title, affiliateUrl: product.affiliateUrl });
+    messageText = instagramProductReply(fromUsername, { id: product.id, title: product.title, affiliateUrl: product.affiliateUrl });
   } else {
     // Si no encontramos el producto específico del posteo, le enviamos el catálogo completo
     messageText = `¡Hola @${fromUsername}! 👋\n\nPodés ver todos nuestros productos recomendados y enlaces de ofertas acá:\n\n👉 ${catalogUrl}\n\n¡Que lo disfrutes!`;
@@ -252,7 +253,7 @@ export async function processInstagramDirectMessage(messagingItem: InstagramMess
 
   let replyText = '';
   if (matchedProduct && matchedProduct.affiliateUrl) {
-    replyText = `¡Hola! 👋 Gracias por escribirnos.\n\nAcá tenés el enlace de afiliado para "${matchedProduct.title}":\n👉 ${matchedProduct.affiliateUrl}\n\nMás productos y ofertas:\n👉 ${catalogUrl}\n\n¡Cualquier consulta estamos a disposición!`;
+    replyText = `¡Hola! 👋 Gracias por escribirnos.\n\nPodés ver "${matchedProduct.title}" en SmartBrew:\n👉 ${productUrl(matchedProduct.id)}\n\nEnlace de afiliado para comprarlo:\n👉 ${matchedProduct.affiliateUrl}\n\n¡Cualquier consulta estamos a disposición!`;
   } else {
     replyText = `¡Hola! 👋 Gracias por contactarte con SmartBrew.\n\nEncontrá todos los productos, gadgets y ofertas que publicamos acá con sus enlaces oficiales:\n👉 ${catalogUrl}\n\n¡Que tengas un excelente día!`;
   }

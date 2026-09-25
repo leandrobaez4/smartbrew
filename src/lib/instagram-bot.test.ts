@@ -10,10 +10,11 @@ it('uses the production catalog instead of APP_URL and keeps the affiliate link'
   vi.stubEnv('APP_URL', 'https://smartbrew-rouge.vercel.app');
   expect(instagramCatalogUrl()).toBe('https://www.smartbrew.tech/productos');
   const message = instagramProductReply('leandro.baez1', {
-    title: 'Cafetera Smart', affiliateUrl: 'https://meli.la/oferta',
+    id: 'product-123', title: 'Cafetera Smart', affiliateUrl: 'https://meli.la/oferta',
   });
   expect(message).toContain('https://meli.la/oferta');
-  expect(message).toContain('https://www.smartbrew.tech/productos');
+  expect(message).toContain('https://www.smartbrew.tech/productos/product-123');
+  expect(message).not.toContain('https://www.smartbrew.tech/productos\n');
   expect(message).not.toContain('smartbrew-rouge.vercel.app');
 });
 
