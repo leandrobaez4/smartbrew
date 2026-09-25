@@ -37,12 +37,11 @@ export default async function ProfitabilityPage({ searchParams }: {
     ['ROI', percent(report.totals.roi)],
   ];
 
-  return <main className="min-h-screen bg-gray-100 p-6 text-gray-950 dark:bg-gray-950 dark:text-gray-100">
-    <div className="mx-auto max-w-[1600px]">
+  return <div className="mx-auto max-w-[1600px]">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link href={`/dashboard/dropshipping?period=${period}`} className="text-sm font-semibold text-blue-600 dark:text-blue-400">← Dashboard</Link>
-          <h1 className="mt-2 text-3xl font-bold">Rentabilidad</h1>
+          <h1 className="mt-2 text-2xl font-bold">Rentabilidad</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Snapshots financieros de órdenes desde {report.from.toLocaleDateString('es-AR')}.</p>
         </div>
         <form className="flex flex-wrap items-end gap-2">
@@ -90,6 +89,5 @@ export default async function ProfitabilityPage({ searchParams }: {
           </tbody>
         </table>
       </div>
-    </div>
-  </main>;
+  </div>;
 }

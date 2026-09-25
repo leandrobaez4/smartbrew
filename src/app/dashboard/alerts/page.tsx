@@ -22,7 +22,7 @@ export default async function AlertsPage() {
   return <div className="mx-auto max-w-6xl">
     <div className="mb-6">
       <p className="text-sm font-semibold text-yellow-600">Dropshipping</p>
-      <h1 className="text-3xl font-bold">Alertas</h1>
+      <h1 className="text-2xl font-bold">Alertas</h1>
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{unread} sin leer · últimas {alerts.length} alertas</p>
     </div>
     <div className="space-y-3">

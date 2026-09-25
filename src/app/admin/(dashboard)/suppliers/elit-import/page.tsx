@@ -26,7 +26,7 @@ export default async function ElitImportPage({ searchParams }: {
   return <main className="mx-auto max-w-6xl space-y-6">
     <header>
       <p className="text-sm font-semibold text-yellow-600">Dropshipping · Elit</p>
-      <h1 className="text-3xl font-bold">Configurar costo y precio de publicación</h1>
+      <h1 className="text-2xl font-bold">Configurar costo y precio de publicación</h1>
       <p className="mt-1 text-sm text-gray-500">{product.title} · Código {product.externalId} · SKU {product.sku || '—'}</p>
     </header>
     {query.error && <p className="rounded bg-red-50 p-3 text-sm text-red-800">Revisá los valores del cálculo.</p>}
