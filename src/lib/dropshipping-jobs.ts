@@ -1,5 +1,5 @@
-import { Job, JobsOptions, Queue } from 'bullmq';
-import Redis from 'ioredis';
+import type { Job, JobsOptions } from 'bullmq';
+import { Client, type CreateScheduleRequest } from '@upstash/qstash';
 import { JobStatus, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { portalDb } from './portal';
@@ -43,16 +43,37 @@ const publishJob = z.object({
 }).strict();
 
 type JobData = Record<string, unknown> & { executionId?: string };
-type QueueLike = Pick<Queue, 'add'>;
 type JobStore = Pick<typeof portalDb, 'jobExecution'>;
+type QStashPublisher = Pick<Client, 'publishJSON'>;
+type QStashScheduleClient = {
+  list(): Promise<Array<{ scheduleId: string; destination: string; cron: string; labels?: string[] }>>;
+  create(request: CreateScheduleRequest): Promise<{ scheduleId: string }>;
+  delete(scheduleId: string): Promise<void>;
+};
 
-let connection: Redis | undefined;
-let queue: Queue | undefined;
+const scheduleLabel = 'smartbrew-dropshipping-sync';
+const scheduleJobName = 'DropshippingScheduleDispatch';
 
-export function dropshippingQueue() {
-  if (!connection) connection = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', { maxRetriesPerRequest: null });
-  if (!queue) queue = new Queue('affiliate-jobs', { connection });
-  return queue;
+function qstashConfig() {
+  const token = process.env.QSTASH_TOKEN;
+  const currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
+  const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
+  const appUrl = process.env.APP_URL;
+  if (!token || !currentSigningKey || !nextSigningKey || !appUrl) {
+    throw new Error('Configurá QStash, sus dos claves de firma y APP_URL.');
+  }
+  const destination = new URL('/api/queue/dropshipping', appUrl);
+  if (destination.protocol !== 'https:') throw new Error('APP_URL debe usar HTTPS.');
+  return { token, destination: destination.href };
+}
+
+function qstashHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+      ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
+      : {}),
+  };
 }
 
 export function optionsForDropshippingJob(name: DropshippingJobName): JobsOptions {
@@ -72,9 +93,10 @@ function json(value: unknown): Prisma.InputJsonValue {
 export async function enqueueDropshippingJob(
   name: DropshippingJobName,
   data: Record<string, unknown>,
-  dependencies: { queue?: QueueLike; store?: JobStore } = {},
+  dependencies: { publisher?: QStashPublisher; store?: JobStore } = {},
 ) {
-  const selectedQueue = dependencies.queue || dropshippingQueue();
+  const config = qstashConfig();
+  const publisher = dependencies.publisher || new Client({ token: config.token });
   const store = dependencies.store || portalDb;
   const options = optionsForDropshippingJob(name);
   const maxAttempts = Number(options.attempts || 1);
@@ -82,12 +104,113 @@ export async function enqueueDropshippingJob(
     data: { jobName: name, status: JobStatus.STARTED, inputJson: json(data), maxAttempts },
   });
   try {
-    const queued = await selectedQueue.add(name, { ...data, executionId: execution.id }, { ...options, jobId: execution.id });
-    return { status: 'queued' as const, jobId: queued.id || execution.id };
+    await publisher.publishJSON({
+      url: config.destination,
+      body: { jobId: execution.id },
+      deduplicationId: execution.id,
+      retries: Math.max(0, maxAttempts - 1),
+      timeout: '90s',
+      flowControl: {
+        key: name === DropshippingJobName.MarketplacePublishJob
+          ? 'smartbrew-dropshipping-publish'
+          : 'smartbrew-dropshipping-sync',
+        parallelism: 1,
+      },
+      headers: qstashHeaders(),
+    });
+    return { status: 'queued' as const, jobId: execution.id };
   } catch (error) {
     await store.jobExecution.update({
       where: { id: execution.id },
       data: { status: JobStatus.FAILED, errorMessage: 'No se pudo encolar el trabajo.', finishedAt: new Date() },
+    });
+    throw new Error('No se pudo confirmar el envío del trabajo a QStash.', { cause: error });
+  }
+}
+
+function jobInput(value: Prisma.JsonValue | null): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+export async function processDropshippingQStashJob(
+  jobId: string,
+  dependencies: Parameters<typeof executeDropshippingJob>[1] & { store?: JobStore } = {},
+) {
+  const store = dependencies.store || portalDb;
+  const execution = await store.jobExecution.findUnique({ where: { id: jobId } });
+  if (!execution || !Object.values(DropshippingJobName).includes(execution.jobName as DropshippingJobName)) {
+    throw new Error('Trabajo de dropshipping inválido.');
+  }
+  if (execution.status !== JobStatus.STARTED) return { status: 'duplicate' as const };
+  return executeDropshippingJob({
+    id: execution.id,
+    name: execution.jobName,
+    data: { ...jobInput(execution.inputJson), executionId: execution.id },
+    attemptsMade: execution.attemptCount,
+    opts: { attempts: execution.maxAttempts },
+  }, dependencies);
+}
+
+export async function ensureDropshippingQStashSchedule(scheduleClient?: QStashScheduleClient) {
+  const config = qstashConfig();
+  const schedules = scheduleClient || new Client({ token: config.token }).schedules;
+  const existing = (await schedules.list()).filter((schedule) => schedule.labels?.includes(scheduleLabel));
+  const request = {
+    destination: config.destination,
+    body: JSON.stringify({ schedule: 'dropshipping' }),
+    headers: qstashHeaders(),
+    cron: '* * * * *',
+    retries: 2,
+    timeout: 90,
+    flowControl: { key: 'smartbrew-dropshipping-schedule', parallelism: 1 },
+    label: scheduleLabel,
+  };
+  const primary = existing[0];
+  const result = await schedules.create(primary ? { ...request, scheduleId: primary.scheduleId } : request);
+  await Promise.all(existing.slice(1).map((schedule) => schedules.delete(schedule.scheduleId)));
+  return { scheduleId: result.scheduleId, repaired: Boolean(primary), removedDuplicates: Math.max(0, existing.length - 1) };
+}
+
+export async function dispatchScheduledDropshippingJobs(dependencies: {
+  store?: JobStore;
+  publisher?: QStashPublisher;
+  getSettings?: typeof getDropshippingSettings;
+  now?: () => Date;
+} = {}) {
+  const store = dependencies.store || portalDb;
+  const now = (dependencies.now || (() => new Date()))();
+  const settings = await (dependencies.getSettings || getDropshippingSettings)();
+  const latest = await store.jobExecution.findFirst({
+    where: { jobName: scheduleJobName, status: { in: [JobStatus.STARTED, JobStatus.SUCCEEDED] } },
+    orderBy: { startedAt: 'desc' },
+  });
+  if (latest && now.getTime() - latest.startedAt.getTime() < settings.supplierSyncInterval * 60_000) {
+    return { status: 'not_due' as const, nextAfter: new Date(latest.startedAt.getTime() + settings.supplierSyncInterval * 60_000) };
+  }
+  const dispatch = await store.jobExecution.create({
+    data: { jobName: scheduleJobName, status: JobStatus.STARTED, inputJson: { intervalMinutes: settings.supplierSyncInterval } },
+  });
+  const jobs = [
+    DropshippingJobName.SupplierStockSyncJob,
+    DropshippingJobName.MarketplaceStockSyncJob,
+    DropshippingJobName.MarketplacePriceSyncJob,
+  ];
+  try {
+    const queued = [];
+    for (const name of jobs) {
+      queued.push(await enqueueDropshippingJob(name, {}, { store, publisher: dependencies.publisher }));
+    }
+    await store.jobExecution.update({
+      where: { id: dispatch.id },
+      data: { status: JobStatus.SUCCEEDED, outputJson: { jobs: queued.map((job) => job.jobId) }, finishedAt: now },
+    });
+    return { status: 'queued' as const, jobs: queued.map((job) => job.jobId) };
+  } catch (error) {
+    await store.jobExecution.update({
+      where: { id: dispatch.id },
+      data: { status: JobStatus.FAILED, errorMessage: error instanceof Error ? error.message.slice(0, 1_000) : 'No se pudo programar la sincronización.', finishedAt: now },
     });
     throw error;
   }

@@ -8,6 +8,8 @@ Registrar en la aplicación de Mercado Libre la URL exacta:
 https://www.smartbrew.tech/api/mercado-libre/oauth/callback
 ```
 
+En **Flujos OAuth**, mantener activados **Authorization Code** y **Refresh Token**. SmartBrew necesita el refresh token para renovar la conexión sin intervención manual.
+
 Configurar en el servidor:
 
 ```ini

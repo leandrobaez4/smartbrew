@@ -61,7 +61,7 @@ export default async function DropshippingSettingsPage({ searchParams }: Props) 
         </fieldset>
 
         <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Los defaults son conservadores. Dry Run sigue teniendo prioridad y bloquea toda escritura externa.
+          Los trabajos se ejecutan mediante QStash. Guardar esta pantalla crea o repara el scheduler. Dry Run sigue teniendo prioridad y bloquea toda escritura externa.
         </div>
         <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">Guardar configuración</button>
       </form>

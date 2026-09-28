@@ -19,7 +19,7 @@ export default async function MercadoLibreSettingsPage({ searchParams }: {
   const errorMessages: Record<string, string> = {
     invalid_callback: 'Mercado Libre devolvió una respuesta incompleta. Iniciá la conexión nuevamente.',
     invalid_state: 'La autorización venció o ya fue utilizada. Iniciá la conexión nuevamente.',
-    token_exchange: 'Mercado Libre rechazó el intercambio del código. Revisá el Client ID, el Client Secret y la Redirect URI.',
+    token_exchange: 'Mercado Libre rechazó el intercambio o no devolvió un refresh token. Revisá las credenciales, la Redirect URI y que el flujo Refresh Token esté activado en la aplicación.',
     credential_storage: 'Mercado Libre autorizó la cuenta, pero SmartBrew no pudo guardar los tokens. Revisá SUPPLIER_CREDENTIALS_ENCRYPTION_KEY.',
   };
 

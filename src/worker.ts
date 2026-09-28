@@ -1,35 +1,15 @@
-import { Queue, Worker } from 'bullmq';
+import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { createProductSlug } from './lib/product-slug';
 import { MercadoLibreClient } from './lib/domain/ml-client';
 import { OpenAICopyGenerator } from './lib/domain/openai-client';
 import { calculateOpportunityScore } from './lib/domain/scoring';
-import { supplierSyncIntervalMs } from './lib/suppliers/sync';
-import { getDropshippingSettings } from './lib/dropshipping-settings';
-import { DropshippingJobName, executeDropshippingJob, optionsForDropshippingJob } from './lib/dropshipping-jobs';
+import { DropshippingJobName, executeDropshippingJob } from './lib/dropshipping-jobs';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 const prisma = new PrismaClient();
-const queue = new Queue('affiliate-jobs', { connection });
-
-const scheduledDropshippingJobs = [
-  DropshippingJobName.SupplierCatalogSyncJob,
-  DropshippingJobName.SupplierStockSyncJob,
-  DropshippingJobName.SupplierPriceSyncJob,
-  DropshippingJobName.MarketplaceStockSyncJob,
-  DropshippingJobName.MarketplacePriceSyncJob,
-  DropshippingJobName.MarketplaceFeeSyncJob,
-  DropshippingJobName.SupplierOrderStatusSyncJob,
-];
-
-void getDropshippingSettings().then((settings) => Promise.all(scheduledDropshippingJobs.map((name) => queue.upsertJobScheduler(
-  name,
-  { every: supplierSyncIntervalMs(String(settings.supplierSyncInterval)) },
-  { name, data: {}, opts: optionsForDropshippingJob(name) },
-)))).then(() => console.log('Dropshipping schedulers configured.'))
-  .catch((error) => console.error('Failed to configure supplier catalog scheduler:', error));
 
 console.log('Worker connecting to Redis...', redisUrl);
 

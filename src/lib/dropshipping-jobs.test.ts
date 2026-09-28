@@ -1,16 +1,21 @@
 import { JobStatus } from '@prisma/client';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DropshippingJobName,
   enqueueDropshippingJob,
+  dispatchScheduledDropshippingJobs,
+  ensureDropshippingQStashSchedule,
   executeDropshippingJob,
   optionsForDropshippingJob,
+  processDropshippingQStashJob,
 } from './dropshipping-jobs';
 
 function store() {
   return {
     jobExecution: {
       create: vi.fn().mockResolvedValue({ id: 'execution-1' }),
+      findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue({ id: 'execution-1' }),
       upsert: vi.fn().mockResolvedValue({ id: 'execution-1' }),
     },
@@ -44,6 +49,13 @@ const getSettings = vi.fn().mockResolvedValue({
 });
 
 describe('dropshipping jobs', () => {
+  beforeEach(() => {
+    vi.stubEnv('QSTASH_TOKEN', 'test-token');
+    vi.stubEnv('QSTASH_CURRENT_SIGNING_KEY', 'current-key');
+    vi.stubEnv('QSTASH_NEXT_SIGNING_KEY', 'next-key');
+    vi.stubEnv('APP_URL', 'https://www.smartbrew.tech');
+  });
+
   it('configures exponential retries for idempotent synchronization jobs', () => {
     expect(optionsForDropshippingJob(DropshippingJobName.SupplierCatalogSyncJob)).toMatchObject({
       attempts: 4,
@@ -55,9 +67,9 @@ describe('dropshipping jobs', () => {
 
   it('persists and enqueues jobs without running the external operation in the caller', async () => {
     const database = store();
-    const queue = { add: vi.fn().mockResolvedValue({ id: 'execution-1' }) };
+    const publisher = { publishJSON: vi.fn().mockResolvedValue({ messageId: 'message-1' }) };
     const result = await enqueueDropshippingJob(DropshippingJobName.SupplierOrderJob, { orderId: 'order-1' }, {
-      queue: queue as never,
+      publisher: publisher as never,
       store: database as never,
     });
     expect(result).toEqual({ status: 'queued', jobId: 'execution-1' });
@@ -66,22 +78,101 @@ describe('dropshipping jobs', () => {
       status: JobStatus.STARTED,
       maxAttempts: 1,
     }) });
-    expect(queue.add).toHaveBeenCalledWith(
-      DropshippingJobName.SupplierOrderJob,
-      { orderId: 'order-1', executionId: 'execution-1' },
-      expect.objectContaining({ attempts: 1, jobId: 'execution-1' }),
-    );
+    expect(publisher.publishJSON).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://www.smartbrew.tech/api/queue/dropshipping',
+      body: { jobId: 'execution-1' },
+      deduplicationId: 'execution-1',
+      retries: 0,
+    }));
   });
 
   it('records queue failures as failed jobs', async () => {
     const database = store();
-    const queue = { add: vi.fn().mockRejectedValue(new Error('redis unavailable')) };
+    const publisher = { publishJSON: vi.fn().mockRejectedValue(new Error('qstash unavailable')) };
     await expect(enqueueDropshippingJob(DropshippingJobName.MarketplaceStockSyncJob, {}, {
-      queue: queue as never,
+      publisher: publisher as never,
       store: database as never,
-    })).rejects.toThrow('redis unavailable');
+    })).rejects.toThrow('QStash');
     expect(database.jobExecution.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: JobStatus.FAILED }),
+    }));
+  });
+
+  it('creates one labeled QStash schedule and repairs duplicates', async () => {
+    const schedules = {
+      list: vi.fn().mockResolvedValue([
+        { scheduleId: 'schedule-1', destination: 'old', cron: '0 * * * *', labels: ['smartbrew-dropshipping-sync'] },
+        { scheduleId: 'schedule-duplicate', destination: 'old', cron: '0 * * * *', labels: ['smartbrew-dropshipping-sync'] },
+      ]),
+      create: vi.fn().mockResolvedValue({ scheduleId: 'schedule-1' }),
+      delete: vi.fn().mockResolvedValue(undefined),
+    };
+    await expect(ensureDropshippingQStashSchedule(schedules)).resolves.toEqual({
+      scheduleId: 'schedule-1', repaired: true, removedDuplicates: 1,
+    });
+    expect(schedules.create).toHaveBeenCalledWith(expect.objectContaining({
+      scheduleId: 'schedule-1',
+      destination: 'https://www.smartbrew.tech/api/queue/dropshipping',
+      cron: '* * * * *',
+      body: JSON.stringify({ schedule: 'dropshipping' }),
+    }));
+    expect(schedules.delete).toHaveBeenCalledWith('schedule-duplicate');
+  });
+
+  it('dispatches the supplier, stock and price chain through QStash when due', async () => {
+    const database = store();
+    database.jobExecution.create
+      .mockResolvedValueOnce({ id: 'dispatch-1' })
+      .mockResolvedValueOnce({ id: 'supplier-1' })
+      .mockResolvedValueOnce({ id: 'stock-1' })
+      .mockResolvedValueOnce({ id: 'price-1' });
+    const publisher = { publishJSON: vi.fn().mockResolvedValue({ messageId: 'message-1' }) };
+    const result = await dispatchScheduledDropshippingJobs({
+      store: database as never,
+      publisher: publisher as never,
+      getSettings,
+      now: () => new Date('2026-09-28T20:00:00Z'),
+    });
+    expect(result).toEqual({ status: 'queued', jobs: ['supplier-1', 'stock-1', 'price-1'] });
+    expect(publisher.publishJSON).toHaveBeenCalledTimes(3);
+    expect(database.jobExecution.create).toHaveBeenNthCalledWith(2, { data: expect.objectContaining({ jobName: DropshippingJobName.SupplierStockSyncJob }) });
+    expect(database.jobExecution.create).toHaveBeenNthCalledWith(3, { data: expect.objectContaining({ jobName: DropshippingJobName.MarketplaceStockSyncJob }) });
+    expect(database.jobExecution.create).toHaveBeenNthCalledWith(4, { data: expect.objectContaining({ jobName: DropshippingJobName.MarketplacePriceSyncJob }) });
+  });
+
+  it('does not dispatch the scheduled chain before the configured interval', async () => {
+    const database = store();
+    database.jobExecution.findFirst.mockResolvedValue({ startedAt: new Date('2026-09-28T19:50:00Z') });
+    const publisher = { publishJSON: vi.fn() };
+    await expect(dispatchScheduledDropshippingJobs({
+      store: database as never,
+      publisher: publisher as never,
+      getSettings,
+      now: () => new Date('2026-09-28T20:00:00Z'),
+    })).resolves.toMatchObject({ status: 'not_due' });
+    expect(publisher.publishJSON).not.toHaveBeenCalled();
+  });
+
+  it('loads and executes a persisted QStash job exactly once', async () => {
+    const database = store();
+    const operations = handlers();
+    database.jobExecution.findUnique.mockResolvedValue({
+      id: 'execution-1',
+      jobName: DropshippingJobName.MarketplaceStockSyncJob,
+      status: JobStatus.STARTED,
+      inputJson: {},
+      attemptCount: 0,
+      maxAttempts: 4,
+    });
+    await processDropshippingQStashJob('execution-1', {
+      store: database as never,
+      handlers: operations as never,
+      withLock,
+      getSettings,
+    });
+    expect(operations.syncMarketplaceStock).toHaveBeenCalledOnce();
+    expect(database.jobExecution.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: JobStatus.SUCCEEDED }),
     }));
   });
 
