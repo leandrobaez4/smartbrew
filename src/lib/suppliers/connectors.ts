@@ -280,7 +280,7 @@ export class SupplierConnectorFactory {
     return this;
   }
 
-  make(config: SupplierConnectorConfig) {
+  private registration(config: SupplierConnectorConfig) {
     const key = (config.connectorKey || config.integrationType).trim().toLowerCase();
     const registration = this.registrations.get(key);
     if (!registration) {
@@ -290,6 +290,15 @@ export class SupplierConnectorFactory {
         supplierId: config.supplierId,
       });
     }
+    return registration;
+  }
+
+  supports(config: SupplierConnectorConfig, capability: SupplierCapability) {
+    return this.registration(config).capabilities.has(capability);
+  }
+
+  make(config: SupplierConnectorConfig) {
+    const registration = this.registration(config);
     return new LoggedSupplierConnector(
       config,
       registration.key,

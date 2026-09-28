@@ -81,10 +81,21 @@ export async function createSupplierOrder(orderId: string, dependencies: Supplie
     }, logger);
     return { status: 'simulated' as const };
   }
+  const factory = dependencies.factory || supplierConnectorFactory;
+  const connectorConfig = supplierConnectorConfig(order.supplier);
+  if (!factory.supports(connectorConfig, 'create-order')) {
+    await logger('WARN', 'supplier_order', 'Supplier order requires manual processing', {
+      orderId: order.id,
+      supplierId: order.supplier.id,
+      supplierProductId: order.supplierProduct.id,
+      reason: 'create-order capability unavailable',
+    });
+    return { status: 'manual_required' as const };
+  }
   if (!await claimOrder(order.id)) return { status: 'in_progress' as const };
 
   try {
-    const connector = (dependencies.factory || supplierConnectorFactory).make(supplierConnectorConfig(order.supplier));
+    const connector = factory.make(connectorConfig);
     const response = await connector.createOrder({
       reference: order.marketplaceOrderId,
       items: [{ externalId: order.supplierProduct.externalId, quantity: order.quantity }],

@@ -43,6 +43,14 @@ function dependencies(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function productOnlyFactory() {
+  return new SupplierConnectorFactory({ info: vi.fn(), error: vi.fn() }).register({
+    key: 'api',
+    capabilities: ['product'],
+    builder: () => connector(),
+  });
+}
+
 describe('SupplierOrderService', () => {
   it.each([undefined, '', 'OFF', 'false', '0'])('keeps automatic purchases disabled for %s', (value) => {
     expect(automaticSupplierOrderingEnabled(value)).toBe(false);
@@ -93,6 +101,20 @@ describe('SupplierOrderService', () => {
     const deps = dependencies({ claimOrder: vi.fn().mockResolvedValue(false) });
     await expect(createSupplierOrder('order-1', deps)).resolves.toEqual({ status: 'in_progress' });
     expect(deps.raw.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('keeps the order pending for manual processing when the adapter cannot create orders', async () => {
+    const deps = dependencies({ factory: productOnlyFactory() });
+
+    await expect(createSupplierOrder('order-1', deps)).resolves.toEqual({ status: 'manual_required' });
+
+    expect(deps.claimOrder).not.toHaveBeenCalled();
+    expect(deps.saveFailure).not.toHaveBeenCalled();
+    expect(deps.raw.createOrder).not.toHaveBeenCalled();
+    expect(deps.logger).toHaveBeenCalledWith(
+      'WARN', 'supplier_order', 'Supplier order requires manual processing',
+      expect.objectContaining({ orderId: 'order-1', supplierId: 'supplier-1', reason: 'create-order capability unavailable' }),
+    );
   });
 
   it('records connector failures without storing secrets', async () => {

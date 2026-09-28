@@ -112,6 +112,20 @@ describe('SupplierConnectorFactory', () => {
     expect(raw.createOrder).not.toHaveBeenCalled();
   });
 
+  it('checks a capability without constructing the provider client', () => {
+    const builder = vi.fn(() => fakeConnector());
+    const factory = new SupplierConnectorFactory(logger).register({
+      key: 'product-only',
+      capabilities: ['product'],
+      builder,
+    });
+    const productConfig = { ...config, connectorKey: 'product-only' };
+
+    expect(factory.supports(productConfig, 'product')).toBe(true);
+    expect(factory.supports(productConfig, 'create-order')).toBe(false);
+    expect(builder).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate canonical keys and aliases', () => {
     const factory = new SupplierConnectorFactory(logger).register({
       key: 'api-v1',
