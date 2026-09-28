@@ -37,7 +37,7 @@ export async function importElitProductAction(payload: string, formData: FormDat
       description: product.description,
       brand: product.brand,
       category: product.category,
-      cost: pricing.supplierCostWithVatArs,
+      cost: pricing.supplierCostWithTaxesArs,
       currency: 'ARS',
       stock: product.stock,
       images: product.images,
@@ -51,13 +51,24 @@ export async function importElitProductAction(payload: string, formData: FormDat
       create: { supplierId: supplier.id, externalId: product.externalId, ...data },
       update: data,
     });
-    if (existing && (Number(existing.cost) !== pricing.supplierCostWithVatArs || existing.stock !== product.stock)) {
-      await tx.supplierProductHistory.create({ data: { supplierProductId: existing.id, cost: pricing.supplierCostWithVatArs, stock: product.stock, createdAt: syncedAt } });
+    if (existing && (Number(existing.cost) !== pricing.supplierCostWithTaxesArs || existing.stock !== product.stock)) {
+      await tx.supplierProductHistory.create({ data: {
+        supplierProductId: existing.id,
+        cost: pricing.supplierCostWithTaxesArs,
+        stock: product.stock,
+        supplierCurrency: pricing.supplierCurrency,
+        supplierPriceUsd: pricing.supplierPriceUsd,
+        exchangeRateArsPerUsd: pricing.exchangeRateArsPerUsd,
+        vatPercentage: pricing.vatPercentage,
+        internalTaxAmountArs: pricing.internalTaxAmountArs,
+        supplierCostWithTaxesArs: pricing.supplierCostWithTaxesArs,
+        createdAt: syncedAt,
+      } });
     }
     await tx.supplierProductPricing.upsert({
       where: { supplierProductId: supplierProduct.id },
-      create: { supplierProductId: supplierProduct.id, ...pricing },
-      update: { ...pricing, marketplaceFeeSyncedAt: null },
+      create: { supplierProductId: supplierProduct.id, ...pricing, supplierPricingUpdatedAt: syncedAt },
+      update: { ...pricing, supplierPricingUpdatedAt: syncedAt, marketplaceFeeSyncedAt: null },
     });
     return supplierProduct;
   });

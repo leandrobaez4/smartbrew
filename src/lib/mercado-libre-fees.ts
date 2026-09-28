@@ -76,8 +76,13 @@ export async function syncMarketplaceFees(client: Pick<MercadoLibreFeeClient, 'q
       });
       const pricing = calculateSupplierProductPricing({
         supplierPriceUsd: Number(record.supplierPriceUsd),
+        supplierCurrency: 'USD',
         exchangeRateArsPerUsd: Number(record.exchangeRateArsPerUsd),
         vatPercentage: Number(record.vatPercentage),
+        internalTaxAmountUsd: Number(record.internalTaxAmountUsd),
+        supplierPvpUsd: Number(record.supplierPvpUsd || 0),
+        supplierPvpArs: Number(record.supplierPvpArs || 0),
+        supplierMarkupPercentage: Number(record.supplierMarkupPercentage || 0),
         productSearchCostArs: Number(record.productSearchCostArs),
         shippingCostArs: Number(record.shippingCostArs),
         marketplaceFeePercentage: quote.percentage,

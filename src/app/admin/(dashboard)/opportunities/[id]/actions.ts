@@ -68,14 +68,43 @@ export async function updateSupplierProductPricingAction(id: string, formData: F
   const parsed = SupplierProductPricingSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(path(id, 'error'));
   const pricing = calculateSupplierProductPricing(parsed.data);
-  await portalDb.$transaction([
-    portalDb.supplierProduct.update({ where: { id }, data: { cost: pricing.supplierCostWithVatArs, currency: 'ARS' } }),
-    portalDb.supplierProductPricing.upsert({
+  const updatedAt = new Date();
+  await portalDb.$transaction(async (tx) => {
+    const current = await tx.supplierProduct.findUnique({
+      where: { id },
+      select: { cost: true, stock: true, pricing: { select: {
+        supplierPriceUsd: true,
+        exchangeRateArsPerUsd: true,
+        vatPercentage: true,
+        internalTaxAmountArs: true,
+      } } },
+    });
+    await tx.supplierProduct.update({ where: { id }, data: { cost: pricing.supplierCostWithTaxesArs, currency: 'ARS' } });
+    await tx.supplierProductPricing.upsert({
       where: { supplierProductId: id },
-      create: { supplierProductId: id, ...pricing },
-      update: { ...pricing, marketplaceFeeSyncedAt: null },
-    }),
-  ]);
+      create: { supplierProductId: id, ...pricing, supplierPricingUpdatedAt: updatedAt },
+      update: { ...pricing, supplierPricingUpdatedAt: updatedAt, marketplaceFeeSyncedAt: null },
+    });
+    const changed = !current?.pricing
+      || Number(current.pricing.supplierPriceUsd) !== pricing.supplierPriceUsd
+      || Number(current.pricing.exchangeRateArsPerUsd) !== pricing.exchangeRateArsPerUsd
+      || Number(current.pricing.vatPercentage) !== pricing.vatPercentage
+      || Number(current.pricing.internalTaxAmountArs) !== pricing.internalTaxAmountArs;
+    if (changed) {
+      await tx.supplierProductHistory.create({ data: {
+        supplierProductId: id,
+        cost: pricing.supplierCostWithTaxesArs,
+        stock: current?.stock,
+        supplierCurrency: pricing.supplierCurrency,
+        supplierPriceUsd: pricing.supplierPriceUsd,
+        exchangeRateArsPerUsd: pricing.exchangeRateArsPerUsd,
+        vatPercentage: pricing.vatPercentage,
+        internalTaxAmountArs: pricing.internalTaxAmountArs,
+        supplierCostWithTaxesArs: pricing.supplierCostWithTaxesArs,
+        createdAt: updatedAt,
+      } });
+    }
+  });
   revalidatePath('/admin/opportunities');
   revalidatePath(`/admin/opportunities/${id}`);
   redirect(`/admin/opportunities/${id}?pricingSaved=1`);

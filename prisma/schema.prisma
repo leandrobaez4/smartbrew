@@ -97,43 +97,58 @@ model SupplierProduct {
 }
 
 model SupplierProductPricing {
-  id                         String          @id @default(cuid())
-  supplierProductId          String          @unique
-  supplierProduct            SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
-  supplierPriceUsd           Decimal
-  exchangeRateArsPerUsd      Decimal
-  supplierPriceArs           Decimal
-  vatPercentage              Decimal
-  vatAmountUsd               Decimal
-  vatAmountArs               Decimal
-  supplierCostWithVatUsd     Decimal
-  supplierCostWithVatArs     Decimal
-  productSearchCostArs       Decimal         @default(0)
-  shippingCostArs            Decimal         @default(0)
-  marketplaceFeePercentage   Decimal         @default(0)
-  marketplaceFixedFeeArs     Decimal         @default(0)
-  marketplaceFeeAmountArs    Decimal         @default(0)
-  marketplaceCategoryId      String?
-  marketplaceListingTypeId   String          @default("gold_special")
-  marketplaceFeeSyncedAt     DateTime?
-  targetMarginPercentage     Decimal         @default(20)
-  targetProfitArs            Decimal
-  totalCostArs               Decimal
-  finalPriceArs              Decimal
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
+  id                       String          @id @default(cuid())
+  supplierProductId        String          @unique
+  supplierProduct          SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  supplierPriceUsd         Decimal
+  supplierCurrency         String          @default("USD")
+  exchangeRateArsPerUsd    Decimal
+  supplierPriceArs         Decimal
+  vatPercentage            Decimal
+  vatAmountUsd             Decimal
+  vatAmountArs             Decimal
+  supplierCostWithVatUsd   Decimal
+  supplierCostWithVatArs   Decimal
+  internalTaxAmountUsd     Decimal         @default(0)
+  internalTaxAmountArs     Decimal         @default(0)
+  supplierCostWithTaxesUsd Decimal         @default(0)
+  supplierCostWithTaxesArs Decimal         @default(0)
+  supplierPvpUsd           Decimal?
+  supplierPvpArs           Decimal?
+  supplierMarkupPercentage Decimal?
+  supplierPricingUpdatedAt DateTime?
+  productSearchCostArs     Decimal         @default(0)
+  shippingCostArs          Decimal         @default(0)
+  marketplaceFeePercentage Decimal         @default(0)
+  marketplaceFixedFeeArs   Decimal         @default(0)
+  marketplaceFeeAmountArs  Decimal         @default(0)
+  marketplaceCategoryId    String?
+  marketplaceListingTypeId String          @default("gold_special")
+  marketplaceFeeSyncedAt   DateTime?
+  targetMarginPercentage   Decimal         @default(20)
+  targetProfitArs          Decimal
+  totalCostArs             Decimal
+  finalPriceArs            Decimal
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
 
   @@index([marketplaceFeeSyncedAt])
   @@index([marketplaceCategoryId])
 }
 
 model SupplierProductHistory {
-  id                String          @id @default(cuid())
-  supplierProductId String
-  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
-  cost              Decimal?
-  stock             Int?
-  createdAt         DateTime        @default(now())
+  id                       String          @id @default(cuid())
+  supplierProductId        String
+  supplierProduct          SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  cost                     Decimal?
+  stock                    Int?
+  supplierCurrency         String?
+  supplierPriceUsd         Decimal?
+  exchangeRateArsPerUsd    Decimal?
+  vatPercentage            Decimal?
+  internalTaxAmountArs     Decimal?
+  supplierCostWithTaxesArs Decimal?
+  createdAt                DateTime        @default(now())
 
   @@index([supplierProductId, createdAt])
 }

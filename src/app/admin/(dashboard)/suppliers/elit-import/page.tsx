@@ -32,8 +32,13 @@ export default async function ElitImportPage({ searchParams }: {
     </p>}
     <PricingCalculatorForm action={save} initial={{
       supplierPriceUsd: product.pricing.supplierPriceUsd ?? 0,
+      supplierCurrency: 'USD',
       exchangeRateArsPerUsd: product.pricing.exchangeRateArsPerUsd ?? 0,
       vatPercentage: product.pricing.vatPercentage,
+      internalTaxAmountUsd: 0,
+      supplierPvpUsd: 0,
+      supplierPvpArs: 0,
+      supplierMarkupPercentage: 0,
       productSearchCostArs: 0,
       shippingCostArs: 0,
       marketplaceFeePercentage: 13,

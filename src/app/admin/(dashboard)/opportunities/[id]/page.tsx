@@ -51,8 +51,13 @@ export default async function SupplierProductEditorialPage({
       {product.pricing.marketplaceFeeSyncedAt && <p className="rounded bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Comisión de Mercado Libre consultada el {product.pricing.marketplaceFeeSyncedAt.toLocaleString('es-AR')}.</p>}
       <PricingCalculatorForm action={updatePricing} submitLabel="Guardar cálculo" initial={{
         supplierPriceUsd: Number(product.pricing.supplierPriceUsd),
+        supplierCurrency: 'USD',
         exchangeRateArsPerUsd: Number(product.pricing.exchangeRateArsPerUsd),
         vatPercentage: Number(product.pricing.vatPercentage),
+        internalTaxAmountUsd: Number(product.pricing.internalTaxAmountUsd),
+        supplierPvpUsd: Number(product.pricing.supplierPvpUsd || 0),
+        supplierPvpArs: Number(product.pricing.supplierPvpArs || 0),
+        supplierMarkupPercentage: Number(product.pricing.supplierMarkupPercentage || 0),
         productSearchCostArs: Number(product.pricing.productSearchCostArs),
         shippingCostArs: Number(product.pricing.shippingCostArs),
         marketplaceFeePercentage: Number(product.pricing.marketplaceFeePercentage),

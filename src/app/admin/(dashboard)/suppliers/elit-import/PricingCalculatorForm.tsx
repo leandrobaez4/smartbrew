@@ -5,8 +5,13 @@ import { calculateSupplierProductPricing } from '@/lib/supplier-product-pricing'
 
 type PricingValues = {
   supplierPriceUsd: number;
+  supplierCurrency: 'USD';
   exchangeRateArsPerUsd: number;
   vatPercentage: number;
+  internalTaxAmountUsd: number;
+  supplierPvpUsd: number;
+  supplierPvpArs: number;
+  supplierMarkupPercentage: number;
   productSearchCostArs: number;
   shippingCostArs: number;
   marketplaceFeePercentage: number;
@@ -42,16 +47,32 @@ export default function PricingCalculatorForm({
       <h2 className="text-lg font-bold">Costo de Elit</h2>
       <p className="mt-1 text-sm text-gray-500">Estos valores llegan desde la extensión y se pueden corregir antes de guardar.</p>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <input type="hidden" name="supplierCurrency" value={values.supplierCurrency} />
         <NumberField name="supplierPriceUsd" label="Precio sin IVA (USD)" value={values.supplierPriceUsd} onChange={updateNumber} />
         <NumberField name="exchangeRateArsPerUsd" label="Tipo de cambio (ARS por USD)" value={values.exchangeRateArsPerUsd} onChange={updateNumber} />
         <NumberField name="vatPercentage" label="IVA (%)" value={values.vatPercentage} onChange={updateNumber} />
+        <NumberField name="internalTaxAmountUsd" label="Impuesto interno (USD)" value={values.internalTaxAmountUsd} onChange={updateNumber} />
       </div>
       {calculation && <dl className="mt-5 grid gap-3 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-950 md:grid-cols-2 lg:grid-cols-4">
         <Metric label="Precio en pesos" value={ars(calculation.supplierPriceArs)} />
         <Metric label="IVA aplicado USD" value={usd(calculation.vatAmountUsd)} />
         <Metric label="IVA aplicado ARS" value={ars(calculation.vatAmountArs)} />
-        <Metric label="Costo Elit con IVA" value={`${usd(calculation.supplierCostWithVatUsd)} · ${ars(calculation.supplierCostWithVatArs)}`} />
+        <Metric label="Impuesto interno aplicado" value={`${usd(calculation.internalTaxAmountUsd)} · ${ars(calculation.internalTaxAmountArs)}`} />
+        <Metric label="Costo Elit con impuestos" value={`${usd(calculation.supplierCostWithTaxesUsd)} · ${ars(calculation.supplierCostWithTaxesArs)}`} />
       </dl>}
+    </section>
+
+    <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <h2 className="text-lg font-bold">Referencia comercial del proveedor</h2>
+      <p className="mt-1 text-sm text-gray-500">El PVP y el markup sirven para comparar. No reemplazan el precio que SmartBrew calcula desde el costo real.</p>
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <NumberField name="supplierPvpUsd" label="PVP Elit (USD, opcional)" value={values.supplierPvpUsd} onChange={updateNumber} required={false} />
+        <NumberField name="supplierPvpArs" label="PVP Elit (ARS, opcional)" value={values.supplierPvpArs} onChange={updateNumber} required={false} />
+        <NumberField name="supplierMarkupPercentage" label="Markup Elit (%, opcional)" value={values.supplierMarkupPercentage} onChange={updateNumber} required={false} />
+      </div>
+      {calculation && (calculation.supplierPvpUsd || calculation.supplierPvpArs) && <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+        Referencia: {calculation.supplierPvpUsd ? usd(calculation.supplierPvpUsd) : '—'} · {calculation.supplierPvpArs ? ars(calculation.supplierPvpArs) : '—'}
+      </p>}
     </section>
 
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
@@ -95,13 +116,14 @@ export default function PricingCalculatorForm({
   </form>;
 }
 
-function NumberField({ name, label, value, onChange }: {
+function NumberField({ name, label, value, onChange, required = true }: {
   name: keyof PricingValues;
   label: string;
   value: number;
   onChange: (name: keyof PricingValues, value: string) => void;
+  required?: boolean;
 }) {
-  return <label className="text-sm font-medium">{label}<input name={name} type="number" min="0" step="0.01" value={value} onChange={(event) => onChange(name, event.target.value)} required className={inputClass} /></label>;
+  return <label className="text-sm font-medium">{label}<input name={name} type="number" min="0" step="0.01" value={value} onChange={(event) => onChange(name, event.target.value)} required={required} className={inputClass} /></label>;
 }
 
 function Metric({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
