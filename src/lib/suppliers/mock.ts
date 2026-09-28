@@ -1,6 +1,7 @@
 import {
   SupplierConnector,
   SupplierConnectorFactory,
+  supplierCapabilities,
   SupplierOrder,
   SupplierOrderInput,
   SupplierOrderStatus,
@@ -166,11 +167,16 @@ export function registerMockSupplierConnector(
   scenario: MockSupplierScenario = {},
 ) {
   const connectors = new Map<string, MockSupplierConnector>();
-  return factory.register('mock', (config) => {
-    const existing = connectors.get(config.supplierId);
-    if (existing) return existing;
-    const connector = new MockSupplierConnector(scenario);
-    connectors.set(config.supplierId, connector);
-    return connector;
+  return factory.register({
+    key: 'mock-v1',
+    aliases: ['mock'],
+    capabilities: supplierCapabilities,
+    builder: (config) => {
+      const existing = connectors.get(config.supplierId);
+      if (existing) return existing;
+      const connector = new MockSupplierConnector(scenario);
+      connectors.set(config.supplierId, connector);
+      return connector;
+    },
   });
 }

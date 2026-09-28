@@ -5,6 +5,7 @@ import {
   SupplierConnectorError,
   SupplierConnectorFactory,
   SupplierIntegrationLogger,
+  supplierCapabilities,
 } from './connectors';
 
 const config = {
@@ -76,6 +77,50 @@ describe('SupplierConnectorFactory', () => {
     expect(() => new SupplierConnectorFactory(logger).make(config)).toThrowError(
       expect.objectContaining({ code: 'CONNECTOR_NOT_REGISTERED', supplierId: 'supplier-1' }),
     );
+  });
+
+  it('resolves a versioned connector through a backwards-compatible alias', async () => {
+    const factory = new SupplierConnectorFactory(logger).register({
+      key: 'api-v1',
+      aliases: ['api'],
+      capabilities: supplierCapabilities,
+      builder: () => fakeConnector(),
+    });
+
+    const connector = factory.make(config);
+
+    expect(connector.connectorKey).toBe('api-v1');
+    expect(connector.supports('stock')).toBe(true);
+    await expect(connector.getStock('p-1')).resolves.toBe(5);
+  });
+
+  it('rejects unsupported capabilities before calling the provider', async () => {
+    const raw = fakeConnector();
+    const factory = new SupplierConnectorFactory(logger).register({
+      key: 'catalog-v1',
+      capabilities: ['catalog', 'product'],
+      builder: () => raw,
+    });
+    const connector = factory.make({ ...config, connectorKey: 'catalog-v1' });
+
+    await expect(connector.createOrder({ reference: 'ML-1', items: [] })).rejects.toEqual(
+      expect.objectContaining<Partial<SupplierConnectorError>>({
+        code: 'CAPABILITY_NOT_SUPPORTED',
+        operation: 'createOrder',
+      }),
+    );
+    expect(raw.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate canonical keys and aliases', () => {
+    const factory = new SupplierConnectorFactory(logger).register({
+      key: 'api-v1',
+      aliases: ['api'],
+      capabilities: ['catalog'],
+      builder: () => fakeConnector(),
+    });
+
+    expect(() => factory.register('api', () => fakeConnector())).toThrow('Connector key already registered: api');
   });
 
   it('centralizes connector errors and logs safe operation metadata', async () => {
