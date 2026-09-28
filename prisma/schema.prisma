@@ -127,6 +127,8 @@ model SupplierProductPricing {
   marketplaceFeeSyncedAt   DateTime?
   targetMarginPercentage   Decimal         @default(20)
   targetProfitArs          Decimal
+  netMarginPercentage      Decimal         @default(0)
+  roiPercentage            Decimal         @default(0)
   totalCostArs             Decimal
   finalPriceArs            Decimal
   createdAt                DateTime        @default(now())

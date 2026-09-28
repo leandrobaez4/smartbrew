@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PricingService } from './pricing';
 
 const finiteMoney = z.coerce.number().finite().nonnegative().max(1_000_000_000);
 const percentage = z.coerce.number().finite().nonnegative().lt(100);
@@ -19,12 +20,14 @@ export const SupplierProductPricingSchema = z.object({
   marketplaceCategoryId: z.string().trim().regex(/^MLA\d+$/, 'Ingresá una categoría de Mercado Libre válida.').or(z.literal('')),
   marketplaceListingTypeId: z.enum(['gold_special', 'gold_pro']),
   targetMarginPercentage: z.coerce.number().finite().nonnegative().max(80),
-});
+}).refine(
+  (value) => value.targetMarginPercentage + value.marketplaceFeePercentage < 100,
+  { message: 'El margen y la comisión deben sumar menos de 100%.', path: ['targetMarginPercentage'] },
+);
 
 export type SupplierProductPricingInput = z.infer<typeof SupplierProductPricingSchema>;
 
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
-const roundUp = (value: number) => Math.ceil((value - Number.EPSILON) * 100) / 100;
 
 export function calculateSupplierProductPricing(input: SupplierProductPricingInput) {
   const parsed = SupplierProductPricingSchema.parse(input);
@@ -36,17 +39,19 @@ export function calculateSupplierProductPricing(input: SupplierProductPricingInp
   const internalTaxAmountArs = parsed.internalTaxAmountUsd * parsed.exchangeRateArsPerUsd;
   const supplierCostWithTaxesUsd = supplierCostWithVatUsd + parsed.internalTaxAmountUsd;
   const supplierCostWithTaxesArs = supplierCostWithVatArs + internalTaxAmountArs;
-  const nonPercentageCosts = supplierCostWithTaxesArs
-    + parsed.productSearchCostArs
-    + parsed.shippingCostArs
-    + parsed.marketplaceFixedFeeArs;
-  const targetProfitArs = nonPercentageCosts * parsed.targetMarginPercentage / 100;
-  const finalPriceArs = roundUp((nonPercentageCosts + targetProfitArs) / (1 - parsed.marketplaceFeePercentage / 100));
-  const marketplaceFeeAmountArs = finalPriceArs * parsed.marketplaceFeePercentage / 100 + parsed.marketplaceFixedFeeArs;
-  const totalCostArs = supplierCostWithTaxesArs
-    + parsed.productSearchCostArs
-    + parsed.shippingCostArs
-    + marketplaceFeeAmountArs;
+  const result = new PricingService({ minimumMarginPercentage: parsed.targetMarginPercentage }).calculate({
+    supplierCost: supplierCostWithTaxesArs,
+    marketplaceFee: parsed.marketplaceFixedFeeArs,
+    marketplaceFeePercentage: parsed.marketplaceFeePercentage,
+    shippingCost: parsed.shippingCostArs,
+    taxes: 0,
+    extraCosts: parsed.productSearchCostArs,
+    targetMarginPercentage: parsed.targetMarginPercentage,
+  });
+  const marketplaceFeeAmountArs = result.marketplaceFeeAmount;
+  const targetProfitArs = result.netProfit;
+  const finalPriceArs = result.recommendedPrice;
+  const totalCostArs = finalPriceArs - targetProfitArs;
 
   return {
     supplierPriceUsd: round(parsed.supplierPriceUsd),
@@ -74,6 +79,8 @@ export function calculateSupplierProductPricing(input: SupplierProductPricingInp
     marketplaceListingTypeId: parsed.marketplaceListingTypeId,
     targetMarginPercentage: round(parsed.targetMarginPercentage),
     targetProfitArs: round(targetProfitArs),
+    netMarginPercentage: result.marginPercentage,
+    roiPercentage: result.roi,
     totalCostArs: round(totalCostArs),
     finalPriceArs,
   };

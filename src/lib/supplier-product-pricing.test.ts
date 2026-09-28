@@ -42,19 +42,22 @@ describe('supplier product pricing', () => {
       shippingCostArs: 8_000,
       marketplaceFeePercentage: 13,
       marketplaceFixedFeeArs: 500,
-      marketplaceFeeAmountArs: 37_063.17,
+      marketplaceFeeAmountArs: 40_064.63,
       marketplaceCategoryId: 'MLA1234',
       marketplaceListingTypeId: 'gold_special',
       targetMarginPercentage: 20,
-      targetProfitArs: 40_782,
-      totalCostArs: 240_473.17,
-      finalPriceArs: 281_255.18,
+      targetProfitArs: 60_868.66,
+      netMarginPercentage: 20,
+      roiPercentage: 25,
+      totalCostArs: 243_474.63,
+      finalPriceArs: 304_343.29,
     });
   });
 
   it('rejects impossible rates and commission percentages', () => {
     expect(SupplierProductPricingSchema.safeParse({ ...input, exchangeRateArsPerUsd: 0 }).success).toBe(false);
     expect(SupplierProductPricingSchema.safeParse({ ...input, marketplaceFeePercentage: 100 }).success).toBe(false);
+    expect(SupplierProductPricingSchema.safeParse({ ...input, marketplaceFeePercentage: 30, targetMarginPercentage: 70 }).success).toBe(false);
   });
 
   it('keeps supplier PVP as a reference instead of using it to set the publication price', () => {

@@ -107,19 +107,19 @@ export async function publishSupplierProduct(
     if (!product) throw new Error('No existe el producto del proveedor.');
     validateProduct(product);
     const marketplaceCategoryId = (product.pricing?.marketplaceCategoryId || product.category)!.trim();
+    const minimumMarginPercentage = dependencies.minimumMarginPercentage
+      ?? configNumber('MINIMUM_PROFIT_PERCENTAGE', 20);
+    const minimumProfitAmount = dependencies.minimumProfitAmount
+      ?? configNumber('MINIMUM_PROFIT_AMOUNT', 0);
     const pricing = product.pricing ? {
       recommendedPrice: Number(product.pricing.finalPriceArs),
       appliedMarginPercentage: Number(product.pricing.targetMarginPercentage),
       netProfit: Number(product.pricing.targetProfitArs),
-      marginPercentage: Number(product.pricing.targetMarginPercentage),
-      roi: Number(product.pricing.totalCostArs) > 0
-        ? Number(product.pricing.targetProfitArs) / Number(product.pricing.totalCostArs) * 100
-        : 0,
+      marginPercentage: Number(product.pricing.netMarginPercentage),
+      roi: Number(product.pricing.roiPercentage),
     } : new PricingService({
-      minimumMarginPercentage: dependencies.minimumMarginPercentage
-        ?? configNumber('MINIMUM_PROFIT_PERCENTAGE', 20),
-      minimumProfitAmount: dependencies.minimumProfitAmount
-        ?? configNumber('MINIMUM_PROFIT_AMOUNT', 0),
+      minimumMarginPercentage,
+      minimumProfitAmount,
     }).calculate({
       supplierCost: Number(product.cost),
       marketplaceFee: input.marketplaceFee,
@@ -128,7 +128,9 @@ export async function publishSupplierProduct(
       extraCosts: input.extraCosts,
       targetMarginPercentage: input.targetMarginPercentage,
     });
-    if (pricing.netProfit < 0) throw new Error('El producto no alcanza la rentabilidad mínima.');
+    if (pricing.netProfit < minimumProfitAmount || pricing.marginPercentage < minimumMarginPercentage) {
+      throw new Error('El producto no alcanza la rentabilidad mínima.');
+    }
 
     if (dependencies.dryRun ?? dropshippingDryRunEnabled()) {
       await logDryRunAction('marketplace_publish', {

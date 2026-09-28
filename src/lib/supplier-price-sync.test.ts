@@ -63,6 +63,7 @@ describe('supplier marketplace price synchronization', () => {
     const deps = {
       ...dependencies([listing({ supplierProduct: { id: 'product-1', cost: new Prisma.Decimal(9_000) } })]),
       dryRun: true,
+      maximumPriceChangePercentage: 10,
     };
     const result = await syncMarketplacePrices(deps);
     expect(deps.priceClient.pause).not.toHaveBeenCalled();
@@ -104,30 +105,45 @@ describe('supplier marketplace price synchronization', () => {
     expect(result.anomalies).toBe(1);
   });
 
-  it('pauses the listing when a higher supplier cost makes it unprofitable', async () => {
+  it('recovers the configured margin with a safe reprice before pausing', async () => {
     const deps = dependencies([listing({
       supplierProduct: { id: 'product-1', cost: new Prisma.Decimal(9_000) },
     })]);
 
     const result = await syncMarketplacePrices(deps);
 
-    expect(deps.priceClient.pause).toHaveBeenCalledWith('MLA123');
-    expect(deps.priceClient.updatePrice).not.toHaveBeenCalled();
-    expect(deps.updateListing).toHaveBeenCalledWith('listing-1', { status: MarketplaceListingStatus.PAUSED });
-    expect(deps.logger).toHaveBeenCalledWith('WARN', 'LOW_MARGIN', expect.any(String), expect.objectContaining({ listingId: 'listing-1' }));
-    expect(result.paused).toBe(1);
+    expect(deps.priceClient.pause).not.toHaveBeenCalled();
+    expect(deps.priceClient.updatePrice).toHaveBeenCalledWith('MLA123', 13_333.34);
+    expect(deps.updateListing).toHaveBeenCalledWith('listing-1', { price: 13_333.34 });
+    expect(result).toMatchObject({ paused: 0, updated: 1 });
   });
 
-  it('pauses instead of repricing after a 50 percent supplier cost increase removes the margin', async () => {
+  it('reprices a cost increase when the required variation stays inside the safety limit', async () => {
     const deps = dependencies([listing({
       supplierProduct: { id: 'product-1', cost: new Prisma.Decimal(7_500) },
     })]);
 
     const result = await syncMarketplacePrices(deps);
 
-    expect(deps.priceClient.pause).toHaveBeenCalledWith('MLA123');
+    expect(deps.priceClient.pause).not.toHaveBeenCalled();
+    expect(deps.priceClient.updatePrice).toHaveBeenCalledWith('MLA123', 11_333.34);
+    expect(result).toMatchObject({ paused: 0, updated: 1, failed: 0 });
+  });
+
+  it('pauses only when the current price is unprofitable and the recovery price is unsafe', async () => {
+    const deps = {
+      ...dependencies([listing({ supplierProduct: { id: 'product-1', cost: new Prisma.Decimal(9_000) } })]),
+      maximumPriceChangePercentage: 10,
+    };
+
+    const result = await syncMarketplacePrices(deps);
+
     expect(deps.priceClient.updatePrice).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ paused: 1, updated: 0, failed: 0 });
+    expect(deps.priceClient.pause).toHaveBeenCalledWith('MLA123');
+    expect(deps.updateListing).toHaveBeenCalledWith('listing-1', { status: MarketplaceListingStatus.PAUSED });
+    expect(deps.logger).toHaveBeenCalledWith('WARN', 'PRICE_ANOMALY', expect.any(String), expect.objectContaining({ reasons: ['CHANGE_PERCENTAGE'] }));
+    expect(deps.logger).toHaveBeenCalledWith('WARN', 'LOW_MARGIN', expect.any(String), expect.objectContaining({ listingId: 'listing-1' }));
+    expect(result).toMatchObject({ paused: 1, anomalies: 1, updated: 0 });
   });
 
   it('does not call Mercado Libre when the recommended price is unchanged', async () => {
@@ -138,6 +154,27 @@ describe('supplier marketplace price synchronization', () => {
     expect(deps.priceClient.updatePrice).not.toHaveBeenCalled();
     expect(deps.updateListing).not.toHaveBeenCalled();
     expect(result.unchanged).toBe(1);
+  });
+
+  it('reprices with the costs, percentage fee and target stored for the product', async () => {
+    const deps = dependencies([listing({
+      price: new Prisma.Decimal(200_000),
+      supplierProduct: {
+        id: 'product-1',
+        cost: new Prisma.Decimal(100_000),
+        pricing: {
+          productSearchCostArs: new Prisma.Decimal(0),
+          shippingCostArs: new Prisma.Decimal(5_000),
+          marketplaceFeePercentage: new Prisma.Decimal(13),
+          marketplaceFixedFeeArs: new Prisma.Decimal(500),
+          targetMarginPercentage: new Prisma.Decimal(20),
+        },
+      },
+    })]);
+
+    await syncMarketplacePrices(deps);
+
+    expect(deps.priceClient.updatePrice).toHaveBeenCalledWith('MLA123', 157_462.69);
   });
 
   it('isolates provider failures and continues with the remaining listings', async () => {

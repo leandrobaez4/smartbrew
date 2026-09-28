@@ -21,6 +21,7 @@ describe('PricingService', () => {
       netProfit: 1_750,
       marginPercentage: 20,
       roi: 25,
+      marketplaceFeeAmount: 1_000,
     });
   });
 
@@ -50,5 +51,24 @@ describe('PricingService', () => {
     expect(() => service.calculate({ ...costs, supplierCost: -1, targetMarginPercentage: 20 })).toThrow('supplierCost');
     expect(() => service.calculate({ ...costs, targetMarginPercentage: 100 })).toThrow('targetMarginPercentage');
     expect(() => new PricingService({ minimumMarginPercentage: 100 })).toThrow('minimumMarginPercentage');
+  });
+
+  it('solves a percentage marketplace fee while preserving net margin and ROI semantics', () => {
+    const result = new PricingService({ minimumMarginPercentage: 20 }).calculate({
+      supplierCost: 100_000,
+      marketplaceFee: 500,
+      marketplaceFeePercentage: 13,
+      shippingCost: 5_000,
+      taxes: 0,
+      extraCosts: 0,
+      targetMarginPercentage: 20,
+    });
+
+    expect(result).toMatchObject({
+      recommendedPrice: 157_462.69,
+      marketplaceFeeAmount: 20_970.15,
+      marginPercentage: 20,
+      roi: 25,
+    });
   });
 });

@@ -66,14 +66,13 @@ export default async function OpportunitiesPage({ searchParams }: {
   const opportunities = calculatedOpportunities.map((row) => {
     const saved = pricingByProduct.get(row.id);
     if (!saved) return row;
-    const totalCost = Number(saved.totalCostArs);
     const profit = Number(saved.targetProfitArs);
     return {
       ...row,
       recommendedPrice: Number(saved.finalPriceArs),
       estimatedProfit: profit,
-      marginPercentage: Number(saved.targetMarginPercentage),
-      roi: totalCost > 0 ? profit / totalCost * 100 : 0,
+      marginPercentage: Number(saved.netMarginPercentage),
+      roi: Number(saved.roiPercentage),
     };
   });
   const suppliers = [...new Map(products.map((product) => [product.supplier.id, product.supplier])).values()];

@@ -87,12 +87,33 @@ describe('supplier marketplace publication', () => {
           finalPriceArs: new Prisma.Decimal(12_345.67),
           targetMarginPercentage: new Prisma.Decimal(25),
           targetProfitArs: new Prisma.Decimal(2_000),
+          netMarginPercentage: new Prisma.Decimal(25),
+          roiPercentage: new Prisma.Decimal(19.33),
           totalCostArs: new Prisma.Decimal(10_345.67),
         },
       }),
     });
     await publishSupplierProduct(request, deps);
     expect(deps.publisher.publish).toHaveBeenCalledWith(expect.objectContaining({ price: 12_345.67 }));
+  });
+
+  it('blocks a saved dashboard price that no longer reaches the configured minimum margin', async () => {
+    const deps = dependencies({
+      findProduct: vi.fn().mockResolvedValue({
+        ...product,
+        pricing: {
+          finalPriceArs: new Prisma.Decimal(10_000),
+          targetMarginPercentage: new Prisma.Decimal(15),
+          targetProfitArs: new Prisma.Decimal(1_500),
+          netMarginPercentage: new Prisma.Decimal(15),
+          roiPercentage: new Prisma.Decimal(17.65),
+          totalCostArs: new Prisma.Decimal(8_500),
+        },
+      }),
+    });
+
+    await expect(publishSupplierProduct(request, deps)).rejects.toThrow('rentabilidad mínima');
+    expect(deps.publisher.publish).not.toHaveBeenCalled();
   });
 
   it('validates and logs a publication without creating a listing or calling the marketplace in dry run', async () => {

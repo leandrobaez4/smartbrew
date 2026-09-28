@@ -108,6 +108,8 @@ export default function PricingCalculatorForm({
         <Metric label="Comisión estimada" value={ars(calculation.marketplaceFeeAmountArs)} />
         <Metric label="Costo total" value={ars(calculation.totalCostArs)} />
         <Metric label="Ganancia" value={ars(calculation.targetProfitArs)} />
+        <Metric label="Margen neto" value={`${calculation.netMarginPercentage.toFixed(2)}%`} />
+        <Metric label="ROI" value={`${calculation.roiPercentage.toFixed(2)}%`} />
         <Metric label="Precio final a publicar" value={ars(calculation.finalPriceArs)} strong />
       </dl> : <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">Revisá los valores: no se puede calcular el precio final.</p>}
     </section>

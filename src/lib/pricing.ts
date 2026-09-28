@@ -3,6 +3,7 @@ import { ProfitabilityResult, ProfitabilityService } from './profitability';
 export type PricingInput = {
   supplierCost: number;
   marketplaceFee: number;
+  marketplaceFeePercentage?: number;
   shippingCost: number;
   taxes: number;
   extraCosts: number;
@@ -17,6 +18,7 @@ export type PricingConfig = {
 export type PricingResult = Pick<ProfitabilityResult, 'netProfit' | 'marginPercentage' | 'roi'> & {
   recommendedPrice: number;
   appliedMarginPercentage: number;
+  marketplaceFeeAmount: number;
 };
 
 function validatePercentage(name: string, value: number) {
@@ -38,15 +40,21 @@ export class PricingService {
 
   calculate(input: PricingInput): PricingResult {
     validatePercentage('targetMarginPercentage', input.targetMarginPercentage);
+    const marketplaceFeePercentage = input.marketplaceFeePercentage ?? 0;
+    validatePercentage('marketplaceFeePercentage', marketplaceFeePercentage);
     const appliedMarginPercentage = Math.max(
       input.targetMarginPercentage,
       this.config.minimumMarginPercentage,
     );
+    if (appliedMarginPercentage + marketplaceFeePercentage >= 100) {
+      throw new Error('The target margin and marketplace fee must add up to less than 100 percent');
+    }
     const profitability = new ProfitabilityService({
       minimumProfitPercentage: appliedMarginPercentage,
       minimumProfitAmount: this.minimumProfitAmount,
     });
     const costs = input.supplierCost + input.marketplaceFee + input.shippingCost + input.taxes + input.extraCosts;
+    const percentageFeeRate = marketplaceFeePercentage / 100;
     const baseInput = {
       supplierCost: input.supplierCost,
       marketplaceFee: input.marketplaceFee,
@@ -54,17 +62,18 @@ export class PricingService {
       taxes: input.taxes,
       extraCosts: input.extraCosts,
     };
-    const recommendation = profitability.calculate({
-      ...baseInput,
-      marketplacePrice: Math.max(costs, 0.01),
-    });
-    let recommendedPrice = recommendation.recommendedPrice;
-    let result = profitability.calculate({ ...baseInput, marketplacePrice: recommendedPrice });
+    const marginRate = appliedMarginPercentage / 100;
+    const priceForMargin = costs / (1 - percentageFeeRate - marginRate);
+    const priceForMinimumProfit = (costs + this.minimumProfitAmount) / (1 - percentageFeeRate);
+    let recommendedPrice = Math.ceil((Math.max(priceForMargin, priceForMinimumProfit) - Number.EPSILON) * 100) / 100;
+    let marketplaceFeeAmount = input.marketplaceFee + recommendedPrice * percentageFeeRate;
+    let result = profitability.calculate({ ...baseInput, marketplaceFee: marketplaceFeeAmount, marketplacePrice: recommendedPrice });
 
     // Currency rounding must never leave the final price one cent below the configured threshold.
     if (!result.meetsMinimumProfitability) {
       recommendedPrice = Math.round((recommendedPrice + 0.01) * 100) / 100;
-      result = profitability.calculate({ ...baseInput, marketplacePrice: recommendedPrice });
+      marketplaceFeeAmount = input.marketplaceFee + recommendedPrice * percentageFeeRate;
+      result = profitability.calculate({ ...baseInput, marketplaceFee: marketplaceFeeAmount, marketplacePrice: recommendedPrice });
     }
     if (result.netProfit < 0 || !result.meetsMinimumProfitability) {
       throw new Error('Unable to calculate a profitable marketplace price');
@@ -76,6 +85,7 @@ export class PricingService {
       netProfit: result.netProfit,
       marginPercentage: result.marginPercentage,
       roi: result.roi,
+      marketplaceFeeAmount: Math.round((marketplaceFeeAmount + Number.EPSILON) * 100) / 100,
     };
   }
 }

@@ -15,6 +15,13 @@ type PriceListing = {
   supplierProduct: {
     id: string;
     cost: Prisma.Decimal | null;
+    pricing?: {
+      productSearchCostArs: Prisma.Decimal;
+      shippingCostArs: Prisma.Decimal;
+      marketplaceFeePercentage: Prisma.Decimal;
+      marketplaceFixedFeeArs: Prisma.Decimal;
+      targetMarginPercentage: Prisma.Decimal;
+    } | null;
   };
 };
 
@@ -53,12 +60,23 @@ function configNumber(name: string, fallback: number) {
   return value;
 }
 
-function costs(dependencies: PriceSyncDependencies) {
+function costs(dependencies: PriceSyncDependencies, listing: PriceListing) {
+  const pricing = listing.supplierProduct.pricing;
+  if (pricing) return {
+    marketplaceFee: Number(pricing.marketplaceFixedFeeArs),
+    marketplaceFeePercentage: Number(pricing.marketplaceFeePercentage),
+    shippingCost: Number(pricing.shippingCostArs),
+    taxes: 0,
+    extraCosts: Number(pricing.productSearchCostArs),
+    targetMarginPercentage: Number(pricing.targetMarginPercentage),
+  };
   return {
     marketplaceFee: dependencies.marketplaceFee ?? configNumber('MARKETPLACE_FEE', 0),
+    marketplaceFeePercentage: 0,
     shippingCost: dependencies.shippingCost ?? configNumber('SHIPPING_COST', 0),
     taxes: dependencies.taxes ?? configNumber('TAXES', 0),
     extraCosts: dependencies.extraCosts ?? configNumber('EXTRA_COSTS', 0),
+    targetMarginPercentage: dependencies.targetMarginPercentage,
   };
 }
 
@@ -74,7 +92,13 @@ export async function syncMarketplacePrices(dependencies: PriceSyncDependencies 
       marketplaceItemId: true,
       price: true,
       status: true,
-      supplierProduct: { select: { id: true, cost: true } },
+      supplierProduct: { select: { id: true, cost: true, pricing: { select: {
+        productSearchCostArs: true,
+        shippingCostArs: true,
+        marketplaceFeePercentage: true,
+        marketplaceFixedFeeArs: true,
+        targetMarginPercentage: true,
+      } } } },
     },
   }));
   const priceClient = dependencies.priceClient || new MercadoLibrePriceClient();
@@ -103,7 +127,7 @@ export async function syncMarketplacePrices(dependencies: PriceSyncDependencies 
       if (!itemId || !Number.isFinite(supplierCost) || !Number.isFinite(currentPrice)) {
         throw new Error('La publicación no tiene costo, precio o ID válido.');
       }
-      const operatingCosts = costs(dependencies);
+      const operatingCosts = costs(dependencies, listing);
       const minimumProfitPercentage = dependencies.minimumProfitPercentage
         ?? configNumber('MINIMUM_PROFIT_PERCENTAGE', 20);
       const minimumProfitAmount = dependencies.minimumProfitAmount
@@ -111,45 +135,27 @@ export async function syncMarketplacePrices(dependencies: PriceSyncDependencies 
       const profitability = new ProfitabilityService({ minimumProfitPercentage, minimumProfitAmount }).calculate({
         supplierCost,
         marketplacePrice: currentPrice,
-        ...operatingCosts,
+        marketplaceFee: operatingCosts.marketplaceFee + currentPrice * operatingCosts.marketplaceFeePercentage / 100,
+        shippingCost: operatingCosts.shippingCost,
+        taxes: operatingCosts.taxes,
+        extraCosts: operatingCosts.extraCosts,
       });
-
-      if (!profitability.meetsMinimumProfitability) {
-        if (dryRun) {
-          result.simulated += 1;
-          await logDryRunAction('marketplace_price_pause', {
-            listingId: listing.id,
-            supplierProductId: listing.supplierProduct.id,
-            supplierCost,
-            currentPrice,
-            marginPercentage: profitability.marginPercentage,
-          }, logger);
-          continue;
-        }
-        await priceClient.pause(itemId);
-        await updateListing(listing.id, { status: MarketplaceListingStatus.PAUSED });
-        result.paused += 1;
-        await logger('WARN', 'LOW_MARGIN', 'Marketplace listing paused because the new supplier cost is not profitable', {
-          listingId: listing.id,
-          supplierProductId: listing.supplierProduct.id,
-          supplierCost,
-          currentPrice,
-          marginPercentage: profitability.marginPercentage,
-        });
-        continue;
-      }
 
       const recommended = new PricingService({
         minimumMarginPercentage: minimumProfitPercentage,
         minimumProfitAmount,
       }).calculate({
         supplierCost,
-        ...operatingCosts,
-        targetMarginPercentage: dependencies.targetMarginPercentage
+        marketplaceFee: operatingCosts.marketplaceFee,
+        marketplaceFeePercentage: operatingCosts.marketplaceFeePercentage,
+        shippingCost: operatingCosts.shippingCost,
+        taxes: operatingCosts.taxes,
+        extraCosts: operatingCosts.extraCosts,
+        targetMarginPercentage: operatingCosts.targetMarginPercentage
           ?? configNumber('TARGET_MARGIN_PERCENTAGE', minimumProfitPercentage),
       });
       if (recommended.recommendedPrice === currentPrice) {
-        result.unchanged += 1;
+        if (profitability.meetsMinimumProfitability) result.unchanged += 1;
         continue;
       }
       const safety = safetyRules.evaluate(currentPrice, recommended.recommendedPrice);
@@ -163,6 +169,30 @@ export async function syncMarketplacePrices(dependencies: PriceSyncDependencies 
           changePercentage: safety.changePercentage,
           reasons: safety.reasons,
         });
+        if (!profitability.meetsMinimumProfitability) {
+          if (dryRun) {
+            result.simulated += 1;
+            await logDryRunAction('marketplace_price_pause', {
+              listingId: listing.id,
+              supplierProductId: listing.supplierProduct.id,
+              supplierCost,
+              currentPrice,
+              marginPercentage: profitability.marginPercentage,
+            }, logger);
+            continue;
+          }
+          await priceClient.pause(itemId);
+          await updateListing(listing.id, { status: MarketplaceListingStatus.PAUSED });
+          result.paused += 1;
+          await logger('WARN', 'LOW_MARGIN', 'Marketplace listing paused because no safe profitable price was available', {
+            listingId: listing.id,
+            supplierProductId: listing.supplierProduct.id,
+            supplierCost,
+            currentPrice,
+            proposedPrice: recommended.recommendedPrice,
+            marginPercentage: profitability.marginPercentage,
+          });
+        }
         continue;
       }
       if (dryRun) {
