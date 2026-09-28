@@ -22,6 +22,9 @@ export type SupplierProduct = {
     vatPercentage?: number | null;
     internalTaxAmountArs?: number | null;
     supplierCostWithTaxesArs?: number | null;
+    supplierPvpUsd?: number | null;
+    supplierPvpArs?: number | null;
+    supplierMarkupPercentage?: number | null;
   };
   rawData: unknown;
 };
