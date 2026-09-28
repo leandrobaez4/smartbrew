@@ -8,6 +8,7 @@ const apiProduct = {
   codigo_alfa: 'AUR-6358',
   codigo_producto: '981-000612',
   nombre: 'Auricular Logitech H111',
+  descripcion: 'Auricular con conexión de 3,5 mm y controles integrados.',
   marca: 'Logitech',
   categoria: 'Auriculares',
   sub_categoria: 'Con cable',
@@ -48,6 +49,7 @@ describe('Elit API adapter', () => {
     expect(normalizeElitApiProduct(apiProduct)).toMatchObject({
       externalId: '6358',
       sku: '981-000612',
+      description: 'Auricular con conexión de 3,5 mm y controles integrados.',
       cost: 20_108.5,
       currency: 'ARS',
       stock: 8,

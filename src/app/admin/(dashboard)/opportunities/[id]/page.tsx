@@ -43,7 +43,7 @@ export default async function SupplierProductEditorialPage({
       <Link href="/admin/opportunities" className="text-sm font-semibold text-blue-600 dark:text-blue-400">← Oportunidades</Link>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-sm font-semibold text-yellow-600">{product.supplier.name}</p><h1 className="text-2xl font-bold">Revisión editorial</h1><p className="mt-1 text-sm text-gray-500">Estado: {product.editorialStatus}</p></div>
-        <form action={generate}><button className="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">Generar con IA</button></form>
+        <form action={generate}><button className="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">{product.supplier.integrationType === 'API' ? `Actualizar desde ${product.supplier.name} y generar con IA` : `Generar con IA desde datos de ${product.supplier.name}`}</button></form>
       </div>
     </div>
 
@@ -56,7 +56,7 @@ export default async function SupplierProductEditorialPage({
 
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
       <h2 className="font-bold">Datos reales del proveedor</h2>
-      <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2"><div><dt className="text-gray-500">Título</dt><dd>{product.title}</dd></div><div><dt className="text-gray-500">Marca / categoría</dt><dd>{product.brand || '—'} · {product.category || '—'}</dd></div><div className="md:col-span-2"><dt className="text-gray-500">Descripción</dt><dd className="whitespace-pre-wrap">{product.description || '—'}</dd></div><div className="md:col-span-2"><dt className="text-gray-500">Atributos</dt><dd className="overflow-auto whitespace-pre-wrap font-mono text-xs">{JSON.stringify(product.attributes, null, 2)}</dd></div></dl>
+      <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2"><div><dt className="text-gray-500">Título</dt><dd>{product.title}</dd></div><div><dt className="text-gray-500">Marca / categoría</dt><dd>{product.brand || '—'} · {product.category || '—'}</dd></div><div><dt className="text-gray-500">Identificadores</dt><dd>ID {product.externalId} · SKU {product.sku || '—'} · EAN {product.ean || '—'}</dd></div><div><dt className="text-gray-500">Fuente editorial</dt><dd>{product.supplier.integrationType === 'API' ? `API de ${product.supplier.name}` : `Snapshot importado de ${product.supplier.name}`} · actualizado {product.lastSyncAt.toLocaleString('es-AR')}</dd></div><div className="md:col-span-2"><dt className="text-gray-500">Descripción</dt><dd className="whitespace-pre-wrap">{product.description || '—'}</dd></div><div className="md:col-span-2"><dt className="text-gray-500">Atributos</dt><dd className="overflow-auto whitespace-pre-wrap font-mono text-xs">{JSON.stringify(product.attributes, null, 2)}</dd></div></dl>
     </section>
 
     {product.pricing && <section className="space-y-4">
