@@ -5,13 +5,14 @@ import { openSupplierCredential } from '../supplier-credentials';
 import { importSupplierProducts } from './catalog';
 import { SupplierConnectorFactory } from './connectors';
 import { registerElitSnapshotConnector } from './elit-snapshot';
+import { registerManualSupplierConnector } from './manual';
 import { registerMockSupplierConnector } from './mock';
 
 type SupplierStore = Pick<typeof portalDb, 'supplier'>;
 type SyncLogger = typeof logSystemEvent;
 
 export const supplierConnectorFactory = registerElitSnapshotConnector(
-  registerMockSupplierConnector(new SupplierConnectorFactory()),
+  registerManualSupplierConnector(registerMockSupplierConnector(new SupplierConnectorFactory())),
 );
 
 function credential(value: string | null, supplierId: string, field: string) {
