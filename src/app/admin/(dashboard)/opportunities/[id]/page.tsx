@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { portalDb, requireAdmin } from '@/lib/portal';
+import { compareSupplierPvp, resolveSupplierPvpArs } from '@/lib/supplier-pvp-comparison';
 import PricingCalculatorForm from '@/app/admin/(dashboard)/suppliers/elit-import/PricingCalculatorForm';
 import { approveSupplierEditorialAction, generateSupplierEditorialAction, updateSupplierProductPricingAction } from './actions';
 
@@ -8,6 +9,10 @@ export const dynamic = 'force-dynamic';
 
 function textList(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string').join('\n') : '';
+}
+
+function money(value: number) {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 }
 
 export default async function SupplierProductEditorialPage({
@@ -19,12 +24,19 @@ export default async function SupplierProductEditorialPage({
 }) {
   await requireAdmin();
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const product = await portalDb.supplierProduct.findUnique({ where: { id }, include: { supplier: true, pricing: true } });
+  const product = await portalDb.supplierProduct.findUnique({ where: { id }, include: { supplier: true, pricing: true, listings: { orderBy: { updatedAt: 'desc' }, take: 1 } } });
   if (!product) notFound();
   const generate = generateSupplierEditorialAction.bind(null, id);
   const approve = approveSupplierEditorialAction.bind(null, id);
   const updatePricing = updateSupplierProductPricingAction.bind(null, id);
   const inputClass = 'mt-1 block w-full rounded-md border border-gray-300 bg-white p-2 text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
+  const supplierPvpArs = product.pricing ? resolveSupplierPvpArs({
+    supplierPvpArs: Number(product.pricing.supplierPvpArs || 0),
+    supplierPvpUsd: Number(product.pricing.supplierPvpUsd || 0),
+    exchangeRateArsPerUsd: Number(product.pricing.exchangeRateArsPerUsd),
+  }) : null;
+  const listing = product.listings[0];
+  const pvpComparison = compareSupplierPvp(supplierPvpArs, listing?.price == null ? null : Number(listing.price));
 
   return <main className="mx-auto max-w-5xl space-y-6">
     <div>
@@ -48,6 +60,15 @@ export default async function SupplierProductEditorialPage({
 
     {product.pricing && <section className="space-y-4">
       <div><h2 className="text-2xl font-bold">Calculadora de publicación</h2><p className="mt-1 text-sm text-gray-500">Todos los importes pueden revisarse y configurarse desde SmartBrew.</p></div>
+      <div className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+        <h3 className="font-bold">PVP del proveedor vs. nuestra publicación</h3>
+        {pvpComparison ? <dl className="mt-3 grid gap-3 text-sm md:grid-cols-4">
+          <div><dt className="text-gray-500">PVP proveedor</dt><dd className="font-semibold">{money(pvpComparison.supplierPvpArs)}</dd></div>
+          <div><dt className="text-gray-500">Precio publicado</dt><dd className="font-semibold">{money(pvpComparison.publishedPriceArs)}</dd></div>
+          <div><dt className="text-gray-500">Diferencia</dt><dd className="font-semibold">{money(pvpComparison.differenceArs)} ({pvpComparison.differencePercentage.toFixed(2)}%)</dd></div>
+          <div><dt className="text-gray-500">Posición</dt><dd className={pvpComparison.position === 'BELOW' ? 'font-semibold text-red-700 dark:text-red-400' : pvpComparison.position === 'ABOVE' ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'font-semibold'}>{pvpComparison.position === 'BELOW' ? 'Debajo del PVP' : pvpComparison.position === 'ABOVE' ? 'Encima del PVP' : 'Igual al PVP'}</dd></div>
+        </dl> : <p className="mt-2 text-sm text-gray-500">La comparación estará disponible cuando el proveedor informe PVP y exista una publicación con precio sincronizado.</p>}
+      </div>
       {product.pricing.marketplaceFeeSyncedAt && <p className="rounded bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Comisión de Mercado Libre consultada el {product.pricing.marketplaceFeeSyncedAt.toLocaleString('es-AR')}.</p>}
       <PricingCalculatorForm action={updatePricing} submitLabel="Guardar cálculo" initial={{
         supplierPriceUsd: Number(product.pricing.supplierPriceUsd),
