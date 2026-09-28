@@ -30,11 +30,12 @@ export class MercadoLibrePublisher implements MarketplacePublisher {
   constructor(
     private readonly accessToken?: string,
     private readonly baseUrl = process.env.MERCADO_LIBRE_API_BASE_URL || 'https://api.mercadolibre.com',
+    private readonly accountId?: string,
   ) {}
 
   private async request(path: string, body: unknown) {
     if (this.accessToken !== undefined && !this.accessToken.trim()) throw new MarketplacePublicationError('Mercado Libre no está configurado.');
-    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken();
+    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken({ accountId: this.accountId });
     return fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: {

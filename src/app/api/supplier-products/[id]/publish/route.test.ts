@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ authorized: vi.fn(), enqueue: vi.fn() }));
+const mocks = vi.hoisted(() => ({ authorized: vi.fn(), enqueue: vi.fn(), findJob: vi.fn() }));
 vi.mock('@/lib/admin-api', () => ({ hasAdminApiSession: mocks.authorized }));
 vi.mock('@/lib/dropshipping-jobs', () => ({ DropshippingJobName: { MarketplacePublishJob: 'MarketplacePublishJob' }, enqueueDropshippingJob: mocks.enqueue }));
+vi.mock('@/lib/portal', () => ({ portalDb: { jobExecution: { findFirst: mocks.findJob } } }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 const context = (id = 'product-1') => ({ params: Promise.resolve({ id }) });
 const validBody = {
@@ -53,5 +54,22 @@ describe('POST /api/supplier-products/[id]/publish', () => {
     const response = await POST(request(), context());
     expect(response.status).toBe(503);
     expect(JSON.stringify(await response.json())).not.toContain('secret provider response');
+  });
+
+  it('returns the authenticated publication result for client polling', async () => {
+    mocks.authorized.mockResolvedValue(true);
+    mocks.findJob.mockResolvedValue({ status: 'FAILED', errorMessage: 'Falta una categoría válida.', outputJson: null });
+    const response = await GET(new Request('http://localhost/api/supplier-products/product-1/publish?jobId=job-1'), context());
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'FAILED', error: 'Falta una categoría válida.', dryRun: false });
+    expect(mocks.findJob).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'job-1', entityId: 'product-1', entityType: 'SupplierProduct' }),
+    }));
+  });
+
+  it('does not expose another product publication job', async () => {
+    mocks.authorized.mockResolvedValue(true);
+    mocks.findJob.mockResolvedValue(null);
+    expect((await GET(new Request('http://localhost/api/supplier-products/product-1/publish?jobId=job-2'), context())).status).toBe(404);
   });
 });

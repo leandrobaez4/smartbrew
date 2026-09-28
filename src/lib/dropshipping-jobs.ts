@@ -90,6 +90,16 @@ function json(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
+function jobEntity(name: DropshippingJobName, data: Record<string, unknown>) {
+  if (name === DropshippingJobName.MarketplacePublishJob && typeof data.supplierProductId === 'string') {
+    return { entityType: 'SupplierProduct', entityId: data.supplierProductId };
+  }
+  if (name === DropshippingJobName.SupplierOrderJob && typeof data.orderId === 'string') {
+    return { entityType: 'Order', entityId: data.orderId };
+  }
+  return {};
+}
+
 export async function enqueueDropshippingJob(
   name: DropshippingJobName,
   data: Record<string, unknown>,
@@ -101,7 +111,7 @@ export async function enqueueDropshippingJob(
   const options = optionsForDropshippingJob(name);
   const maxAttempts = Number(options.attempts || 1);
   const execution = await store.jobExecution.create({
-    data: { jobName: name, status: JobStatus.STARTED, inputJson: json(data), maxAttempts },
+    data: { jobName: name, status: JobStatus.STARTED, inputJson: json(data), maxAttempts, ...jobEntity(name, data) },
   });
   try {
     await publisher.publishJSON({

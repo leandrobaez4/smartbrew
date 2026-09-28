@@ -88,7 +88,7 @@ export async function publishSupplierProduct(
     where: { id },
     include: { supplier: true, pricing: true },
   }));
-  const publisher = dependencies.publisher || new MercadoLibrePublisher();
+  const publisher = dependencies.publisher || new MercadoLibrePublisher(undefined, undefined, input.marketplaceAccountId);
   const linkListing = dependencies.linkListing || linkMarketplaceListing;
   const syncListing = dependencies.syncListing || synchronizeMarketplaceListing;
   const failListing = dependencies.failListing || ((listingId: string, marketplaceItemId?: string) => portalDb.marketplaceListing.update({

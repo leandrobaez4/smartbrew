@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const oauth = vi.hoisted(() => ({ token: vi.fn() }));
+vi.mock('./mercado-libre-oauth', () => ({ getMercadoLibreAccessToken: oauth.token }));
+
 import { MercadoLibrePublisher, MarketplacePublicationError } from './mercado-libre-publisher';
 
 const input = {
@@ -41,5 +45,18 @@ describe('MercadoLibrePublisher', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(new MercadoLibrePublisher('', 'https://api.test').publish(input)).rejects.toThrow('no está configurado');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('loads the OAuth token for the account selected by the opportunity', async () => {
+    oauth.token.mockResolvedValue('oauth-token');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'MLA123456' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new MercadoLibrePublisher(undefined, 'https://api.test', '84259783').publish(input);
+    expect(oauth.token).toHaveBeenCalledWith({ accountId: '84259783' });
+    expect(fetchMock).toHaveBeenCalledWith('https://api.test/items', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer oauth-token' }),
+    }));
   });
 });

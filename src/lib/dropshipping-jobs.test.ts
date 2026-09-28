@@ -98,6 +98,18 @@ describe('dropshipping jobs', () => {
     }));
   });
 
+  it('links marketplace publication jobs to their supplier product', async () => {
+    const database = store();
+    const publisher = { publishJSON: vi.fn().mockResolvedValue({ messageId: 'message-1' }) };
+    await enqueueDropshippingJob(DropshippingJobName.MarketplacePublishJob, {
+      supplierProductId: 'product-1', marketplaceAccountId: '84259783', marketplaceFee: 0,
+      shippingCost: 0, taxes: 0, extraCosts: 0, targetMarginPercentage: 20,
+    }, { publisher: publisher as never, store: database as never });
+    expect(database.jobExecution.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      entityType: 'SupplierProduct', entityId: 'product-1',
+    }) });
+  });
+
   it('creates one labeled QStash schedule and repairs duplicates', async () => {
     const schedules = {
       list: vi.fn().mockResolvedValue([
