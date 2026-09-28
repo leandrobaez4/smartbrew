@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Política de privacidad | SmartBrew",
   description:
     "Información sobre cómo SmartBrew recopila, utiliza y protege los datos personales.",
+  alternates: { canonical: "/politica-de-privacidad" },
 };
 
 const sections = [

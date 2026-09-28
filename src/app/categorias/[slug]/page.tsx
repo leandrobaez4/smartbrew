@@ -30,6 +30,11 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
       type: 'website',
       url: `/categorias/${category.slug}`,
     },
+    twitter: {
+      card: 'summary',
+      title,
+      description: category.description,
+    },
   };
 }
 

@@ -67,33 +67,38 @@ const categories = [
 ];
 
 async function getFeaturedProducts() {
-  return loadHomeFeaturedProducts(async () => {
-    const collection = await db.collection.findFirst({
-      where: { slug: HOME_FEATURED_COLLECTION_SLUG, published: true },
-      select: {
-        products: {
-          where: { product: { status: 'ACTIVE', affiliateUrl: { not: null } } },
-          orderBy: { position: 'asc' },
-          take: 8,
-          select: {
-            product: {
-              select: {
-                id: true,
-                title: true,
-                displayTitle: true,
-                shortDescription: true,
-                category: true,
-                primaryImageUrl: true,
-                affiliateUrl: true,
+  try {
+    return await loadHomeFeaturedProducts(async () => {
+      const collection = await db.collection.findFirst({
+        where: { slug: HOME_FEATURED_COLLECTION_SLUG, published: true },
+        select: {
+          products: {
+            where: { product: { status: 'ACTIVE', affiliateUrl: { not: null } } },
+            orderBy: { position: 'asc' },
+            take: 8,
+            select: {
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  displayTitle: true,
+                  shortDescription: true,
+                  category: true,
+                  primaryImageUrl: true,
+                  affiliateUrl: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    return collection?.products.map(({ product }) => product) ?? [];
-  });
+      return collection?.products.map(({ product }) => product) ?? [];
+    });
+  } catch (error) {
+    console.error('Could not load the SmartBrew home collection.', error);
+    return [];
+  }
 }
 
 export default async function Home() {

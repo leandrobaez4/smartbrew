@@ -7,6 +7,7 @@ vi.mock('@prisma/client', () => ({ PrismaClient: class { product = { findFirst: 
 vi.mock('next/navigation', () => ({ notFound: () => { throw Error('404'); } }));
 vi.mock('@/lib/product-url', async () => await import('../../../lib/product-url'));
 vi.mock('@/lib/product-gallery', async () => await import('../../../lib/product-gallery'));
+vi.mock('@/lib/product-seo', async () => await import('../../../lib/product-seo'));
 import Page from './page';
 beforeEach(() => { vi.resetAllMocks(); });
 it('renders a public product, gallery and affiliate CTA without price', async () => {

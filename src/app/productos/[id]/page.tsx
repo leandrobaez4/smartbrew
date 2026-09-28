@@ -1,14 +1,59 @@
+import type { Metadata } from 'next';
 import { PrismaClient } from '@prisma/client';
+import { cache } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { mergeProductImages } from '@/lib/product-gallery';
 import { safeAffiliateUrl } from '@/lib/product-url';
+import {
+  buildProductMetadata,
+  buildProductStructuredData,
+  productDisplayTitle,
+  serializeStructuredData,
+} from '@/lib/product-seo';
 import ProductGallery from './ProductGallery';
 
 export const dynamic = 'force-dynamic';
 const db = new PrismaClient();
+const validProductId = (id: string) => /^[a-zA-Z0-9_-]{1,128}$/.test(id);
+
+const getPublicProduct = cache(async (id: string) => {
+  if (!validProductId(id)) return null;
+  return db.product.findFirst({
+    where: { id, status: 'ACTIVE', affiliateUrl: { not: null } },
+    select: {
+      id: true,
+      externalId: true,
+      title: true,
+      originalTitle: true,
+      originalDescription: true,
+      displayTitle: true,
+      shortDescription: true,
+      description: true,
+      seoTitle: true,
+      seoDescription: true,
+      category: true,
+      whyWePickedIt: true,
+      idealFor: true,
+      highlights: true,
+      price: true,
+      currencyId: true,
+      affiliateUrl: true,
+      primaryImageUrl: true,
+      imageUrls: true,
+    },
+  });
+});
+
+type ProductPageProps = { params: Promise<{ id: string }> };
+
+export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const product = await getPublicProduct((await params).id);
+  if (!product || !safeAffiliateUrl(product.affiliateUrl)) notFound();
+  return buildProductMetadata(product);
+}
 
 function stringList(value: unknown) {
   return Array.isArray(value)
@@ -31,32 +76,13 @@ function formatPrice(price: unknown, currencyId: string | null) {
   }
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductPage({ params }: ProductPageProps) {
   const { id } = await params;
-  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) notFound();
-  const product = await db.product.findFirst({
-    where: { id, status: 'ACTIVE', affiliateUrl: { not: null } },
-    select: {
-      title: true,
-      originalTitle: true,
-      originalDescription: true,
-      displayTitle: true,
-      shortDescription: true,
-      description: true,
-      whyWePickedIt: true,
-      idealFor: true,
-      highlights: true,
-      price: true,
-      currencyId: true,
-      affiliateUrl: true,
-      primaryImageUrl: true,
-      imageUrls: true,
-    },
-  });
+  const product = await getPublicProduct(id);
   if (!product) notFound();
   const affiliateUrl = safeAffiliateUrl(product.affiliateUrl);
   if (!affiliateUrl) notFound();
-  const displayTitle = product.displayTitle || product.originalTitle || product.title;
+  const displayTitle = productDisplayTitle(product);
   const shortDescription = product.shortDescription || product.originalDescription;
   const description = product.description || product.originalDescription;
   const reasons = stringList(product.whyWePickedIt);
@@ -64,6 +90,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const price = formatPrice(product.price, product.currencyId);
   const images = mergeProductImages(product.primaryImageUrl ? [product.primaryImageUrl] : [], product.imageUrls);
   return <div className="catalog-page">
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: serializeStructuredData(buildProductStructuredData({ ...product, affiliateUrl })),
+      }}
+    />
     <header className="catalog-header">
       <Link href="/" className="brand" aria-label="Volver a SmartBrew">
         <Image src="/smartbrew-logo.png" alt="" width={44} height={44} className="brand-mark" />

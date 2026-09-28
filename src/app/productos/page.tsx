@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { PrismaClient } from "@prisma/client";
 import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
@@ -26,6 +27,22 @@ type ProductSearchParams = { q?: string | string[]; categoria?: string | string[
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<ProductSearchParams> }): Promise<Metadata> {
+  const params = searchParams ? await searchParams : {};
+  const filtered = Boolean(firstParam(params.q).trim() || firstParam(params.categoria).trim());
+  const title = 'Productos recomendados de tecnología, gadgets y café | SmartBrew';
+  const description = 'Explorá la selección SmartBrew de tecnología, gadgets, accesorios de café y productos para una rutina más simple.';
+
+  return {
+    title,
+    description,
+    alternates: { canonical: '/productos' },
+    robots: filtered ? { index: false, follow: true } : { index: true, follow: true },
+    openGraph: { title, description, type: 'website', url: '/productos' },
+    twitter: { card: 'summary', title, description },
+  };
 }
 
 async function getPublicProducts() {
