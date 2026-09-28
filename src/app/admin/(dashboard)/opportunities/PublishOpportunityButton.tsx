@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 type PublishResult = { error?: string; jobId?: string };
 type JobResult = { status?: 'STARTED' | 'SUCCEEDED' | 'FAILED'; error?: string | null; dryRun?: boolean };
@@ -16,11 +17,12 @@ async function json<T>(response: Response): Promise<T> {
   }
 }
 
-export default function PublishOpportunityButton({ productId, accountId, costs, disabledReason }: {
+export default function PublishOpportunityButton({ productId, accountId, costs, disabledReason, reviewHref }: {
   productId: string;
   accountId: string;
   costs: { marketplaceFee: number; shippingCost: number; taxes: number; extraCosts: number; targetMarginPercentage: number };
   disabledReason?: string | null;
+  reviewHref?: string;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState('');
@@ -67,5 +69,7 @@ export default function PublishOpportunityButton({ productId, accountId, costs, 
     }
   }
 
-  return <div className="min-w-48"><button type="button" disabled={Boolean(disabledReason) || pending} title={disabledReason || undefined} onClick={publish} className="rounded bg-yellow-500 px-3 py-1.5 text-sm font-semibold text-gray-950 hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-50">{pending ? 'Publicando…' : 'Publicar en ML'}</button>{disabledReason && <p className="mt-1 max-w-56 text-xs text-amber-700 dark:text-amber-400">{disabledReason}</p>}{status && <p className="mt-1 max-w-56 text-xs text-gray-600 dark:text-gray-400" role="status">{status}</p>}</div>;
+  return <div className="min-w-48">{reviewHref && disabledReason
+    ? <Link href={reviewHref} className="inline-block rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500">Revisar y aprobar</Link>
+    : <button type="button" disabled={Boolean(disabledReason) || pending} title={disabledReason || undefined} onClick={publish} className="rounded bg-yellow-500 px-3 py-1.5 text-sm font-semibold text-gray-950 hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-50">{pending ? 'Publicando…' : 'Publicar en ML'}</button>}{disabledReason && <p className="mt-1 max-w-56 text-xs text-amber-700 dark:text-amber-400">{disabledReason}</p>}{status && <p className="mt-1 max-w-56 text-xs text-gray-600 dark:text-gray-400" role="status">{status}</p>}</div>;
 }

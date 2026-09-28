@@ -52,6 +52,7 @@ export default async function SupplierProductEditorialPage({
     {query.pricingSaved && <p className="rounded bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Costos, comisión, margen y precio final actualizados.</p>}
     {query.generated && <p className="rounded bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Contenido generado. Revisalo antes de aprobar.</p>}
     {(query.error || product.editorialError) && <p className="rounded bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">No se pudo procesar el contenido. {product.editorialError || 'Revisá todos los campos.'}</p>}
+    {product.editorialStatus !== 'APPROVED' && <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"><p>Antes de publicar en Mercado Libre, revisá el título, la descripción y los datos generados.</p><a href="#contenido-publicar" className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white hover:bg-emerald-500">Ir a revisar y aprobar</a></div>}
 
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
       <h2 className="font-bold">Datos reales del proveedor</h2>
@@ -89,8 +90,8 @@ export default async function SupplierProductEditorialPage({
       }} />
     </section>}
 
-    <form action={approve} className="space-y-5 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-      <h2 className="font-bold">Contenido a publicar</h2>
+    <form id="contenido-publicar" action={approve} className="scroll-mt-6 space-y-5 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <div><h2 className="font-bold">Contenido a publicar</h2><p className="mt-1 text-sm text-gray-500">Revisá estos campos y presioná “Guardar y aprobar contenido”. Después vas a poder publicar desde Oportunidades.</p></div>
       <label className="block text-sm font-medium">Título<input name="title" className={inputClass} defaultValue={product.editorialTitle || ''} minLength={3} maxLength={120} required /></label>
       <label className="block text-sm font-medium">Descripción<textarea name="description" className={inputClass} rows={8} defaultValue={product.editorialDescription || ''} minLength={40} maxLength={2000} required /></label>
       <div className="grid gap-4 md:grid-cols-2">
