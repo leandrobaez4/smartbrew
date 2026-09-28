@@ -18,6 +18,7 @@ import { logoutAction } from './login/actions';
 const navigation: Array<{ href: string; label: string; icon: LucideIcon; accent?: boolean }> = [
   { href: '/admin/instagram', label: 'Accesos a Instagram', icon: Camera, accent: true },
   { href: '/admin/products', label: 'Productos', icon: Package },
+  { href: '/admin/catalog', label: 'Catálogo unificado', icon: Layers3 },
   { href: '/admin/suppliers', label: 'Proveedores', icon: Truck },
   { href: '/admin/opportunities', label: 'Oportunidades', icon: ChartNoAxesCombined },
   { href: '/admin/dropshipping', label: 'Dashboard Dropshipping', icon: ChartNoAxesCombined },
