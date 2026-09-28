@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { affiliateCatalogItem, mergeCatalogItems, supplierCatalogItem } from '@/lib/catalog-read-model';
 import { portalDb, requireAdmin } from '@/lib/portal';
+import CatalogTable from './CatalogTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +10,6 @@ const pageSize = 25;
 
 function value(params: Record<string, string | string[] | undefined>, name: string) {
   return typeof params[name] === 'string' ? params[name] : '';
-}
-
-function money(amount: number | null, currency: string | null) {
-  if (amount == null) return '—';
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(amount);
 }
 
 function pageHref(params: URLSearchParams, page: number) {
@@ -42,7 +38,12 @@ export default async function CatalogPage({ searchParams }: {
     ...(availability === 'AVAILABLE' ? { stock: { gt: 0 } } : availability === 'UNAVAILABLE' ? { stock: 0 } : {}),
   };
   const [affiliates, supplierProducts, suppliers] = await Promise.all([
-    source !== 'SUPPLIER' && !availability && !supplierId ? portalDb.product.findMany({ where: affiliateWhere, orderBy: { updatedAt: 'desc' }, take: 500 }) : [],
+    source !== 'SUPPLIER' && !availability && !supplierId ? portalDb.product.findMany({
+      where: affiliateWhere,
+      include: { drafts: { include: { publications: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 500,
+    }) : [],
     source !== 'AFFILIATE_MARKETPLACE' ? portalDb.supplierProduct.findMany({
       where: supplierWhere,
       include: { supplier: true, pricing: true, listings: { orderBy: { updatedAt: 'desc' }, take: 1 } },
@@ -60,7 +61,7 @@ export default async function CatalogPage({ searchParams }: {
       status: product.status,
       price: product.price == null ? null : Number(product.price),
       currency: product.currencyId,
-      imageUrl: product.primaryImageUrl,
+      imageUrl: product.primaryImageUrl || product.imageUrls[0] || null,
       affiliateUrl: product.affiliateUrl,
       updatedAt: product.updatedAt,
     })),
@@ -89,6 +90,26 @@ export default async function CatalogPage({ searchParams }: {
   if (source) currentParams.set('source', source);
   if (supplierId) currentParams.set('supplier', supplierId);
   if (availability) currentParams.set('availability', availability);
+  if (currentPage > 1) currentParams.set('page', String(currentPage));
+  const fromUrl = `/admin/catalog${currentParams.size ? `?${currentParams}` : ''}`;
+  const affiliateProducts = affiliates.map((product) => ({
+    id: product.id,
+    title: product.displayTitle || product.title,
+    externalId: product.externalId,
+    marketplace: product.marketplace,
+    status: product.status,
+    price: product.price == null ? null : Number(product.price),
+    currencyId: product.currencyId,
+    primaryImageUrl: product.primaryImageUrl || product.imageUrls[0] || null,
+    originalPermalink: product.originalPermalink,
+    affiliateUrl: product.affiliateUrl,
+    createdAt: product.createdAt,
+    category: product.category,
+    isPublished: product.drafts.some((draft) => draft.publications.some((publication) => publication.platform === 'INSTAGRAM' && publication.status === 'PUBLISHED' && !publication.deletedAt)),
+    instagramPublications: product.drafts.flatMap((draft) => draft.publications).filter((publication) => publication.platform === 'INSTAGRAM' && publication.status === 'PUBLISHED' && !publication.deletedAt).map((publication) => ({ id: publication.id, mediaId: publication.externalMediaId })),
+    instagramBlocked: product.drafts.some((draft) => draft.publications.some((publication) => publication.platform === 'INSTAGRAM' && !publication.deletedAt && ['QUEUED', 'UPLOADING', 'PROCESSING'].includes(publication.status))),
+    imageUrls: product.imageUrls,
+  }));
 
   return <div className="mx-auto max-w-[1500px] space-y-5">
     <div><p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Lectura unificada</p><h1 className="text-2xl font-bold">Catálogo</h1><p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Afiliados y ofertas de proveedores se muestran juntos, pero conservan su identidad, flujo y acciones independientes.</p></div>
@@ -99,21 +120,7 @@ export default async function CatalogPage({ searchParams }: {
       <select name="availability" defaultValue={availability} className="rounded border p-2 dark:border-gray-700 dark:bg-gray-950"><option value="">Toda disponibilidad</option><option value="AVAILABLE">Con stock</option><option value="UNAVAILABLE">Sin stock</option></select>
       <button className="rounded bg-gray-900 px-4 py-2 font-semibold text-white dark:bg-gray-100 dark:text-gray-950">Aplicar filtros</button>
     </form>
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-        <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-950"><tr>{['Producto', 'Origen', 'Identidad', 'Estado', 'Disponibilidad', 'Precio', 'Actualizado', 'Acción'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead>
-        <tbody className="divide-y divide-gray-200 dark:divide-gray-800">{visibleItems.map((item) => <tr key={item.catalogKey}>
-          <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 text-sm font-bold text-gray-500 dark:bg-gray-800">{item.title.charAt(0).toUpperCase()}</div><div><p className="max-w-sm font-semibold">{item.title}</p><p className="text-xs text-gray-500">{item.externalId || 'Sin ID externo'}</p></div></div></td>
-          <td className="px-4 py-3">{item.sourceKind === 'AFFILIATE_MARKETPLACE' ? <span className="rounded-full bg-cyan-100 px-2 py-1 text-xs font-semibold text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">Afiliado · {item.marketplace}</span> : <span className="rounded-full bg-violet-100 px-2 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-950 dark:text-violet-200">Dropshipping · {item.supplierName}</span>}</td>
-          <td className="px-4 py-3 text-sm">{item.sourceKind === 'AFFILIATE_MARKETPLACE' ? <><p>Producto {item.productId}</p><p className="text-xs text-gray-500">Compra externa por enlace de afiliado</p></> : <><p>{item.supplierSlug} · {item.sku || item.externalId}</p><p className="text-xs text-gray-500">Oferta propia del proveedor</p></>}</td>
-          <td className="px-4 py-3 text-sm font-semibold">{item.status}{item.sourceKind === 'SUPPLIER' && item.listingStatus ? <p className="text-xs font-normal text-gray-500">ML: {item.listingStatus}</p> : null}</td>
-          <td className="px-4 py-3 text-sm">{item.sourceKind === 'AFFILIATE_MARKETPLACE' ? 'No aplica' : item.availability === 'UNKNOWN' ? 'Sin informar' : item.availability === 'AVAILABLE' ? `${item.stock} en stock` : 'Sin stock'}</td>
-          <td className="px-4 py-3 text-sm"><p className="font-semibold">{money(item.price, item.currency)}</p>{item.sourceKind === 'SUPPLIER' && item.priceKind ? <p className="text-xs text-gray-500">{item.priceKind === 'PUBLISHED' ? 'Publicado en ML' : 'Calculado por SmartBrew'}</p> : null}</td>
-          <td className="px-4 py-3 text-sm"><time dateTime={item.updatedAt.toISOString()}>{item.updatedAt.toLocaleString('es-AR')}</time>{item.sourceKind === 'SUPPLIER' ? <p className="text-xs text-gray-500">Sync {item.lastSyncAt.toLocaleString('es-AR')}</p> : null}</td>
-          <td className="px-4 py-3"><Link href={item.href} className="font-semibold text-blue-600 hover:underline dark:text-blue-400">{item.sourceKind === 'AFFILIATE_MARKETPLACE' ? 'Ver afiliado' : 'Ver dropshipping'}</Link></td>
-        </tr>)}{!visibleItems.length && <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">No hay productos para estos filtros.</td></tr>}</tbody>
-      </table>
-    </div>
+    <CatalogTable items={visibleItems} affiliateProducts={affiliateProducts} fromUrl={fromUrl} />
     {totalPages > 1 && <nav aria-label="Paginación" className="flex items-center justify-between text-sm"><p>{items.length} productos · página {currentPage} de {totalPages}</p><div className="flex gap-2">{currentPage > 1 && <Link href={pageHref(currentParams, currentPage - 1)} className="rounded border px-3 py-2 dark:border-gray-700">Anterior</Link>}{currentPage < totalPages && <Link href={pageHref(currentParams, currentPage + 1)} className="rounded border px-3 py-2 dark:border-gray-700">Siguiente</Link>}</div></nav>}
   </div>;
 }
