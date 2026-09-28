@@ -24,6 +24,7 @@ const navigation: Array<{ href: string; label: string; icon: LucideIcon; accent?
   { href: '/admin/orders', label: 'Órdenes', icon: ShoppingCart },
   { href: '/admin/alerts', label: 'Alertas', icon: Bell },
   { href: '/admin/settings/dropshipping', label: 'Settings / Dropshipping', icon: Settings },
+  { href: '/admin/settings/mercado-libre', label: 'Mercado Libre OAuth', icon: Settings },
   { href: '/admin/collections', label: 'Colecciones', icon: Layers3 },
   { href: '/admin/imports', label: 'Importaciones HTML', icon: FileText },
   { href: '/admin/drafts', label: 'Borradores', icon: FileText },

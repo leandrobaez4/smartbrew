@@ -1,3 +1,5 @@
+import { getMercadoLibreAccessToken } from './mercado-libre-oauth';
+
 export interface MarketplacePriceClient {
   updatePrice(marketplaceItemId: string, price: number): Promise<void>;
   pause(marketplaceItemId: string): Promise<void>;
@@ -12,18 +14,19 @@ export class MarketplacePriceError extends Error {
 
 export class MercadoLibrePriceClient implements MarketplacePriceClient {
   constructor(
-    private readonly accessToken = process.env.MERCADO_LIBRE_ACCESS_TOKEN || '',
+    private readonly accessToken?: string,
     private readonly baseUrl = process.env.MERCADO_LIBRE_API_BASE_URL || 'https://api.mercadolibre.com',
   ) {}
 
   private async update(marketplaceItemId: string, body: unknown) {
     const itemId = marketplaceItemId.trim();
     if (!itemId) throw new MarketplacePriceError('La publicación no tiene ID de Mercado Libre.');
-    if (!this.accessToken.trim()) throw new MarketplacePriceError('Mercado Libre no está configurado.');
+    if (this.accessToken !== undefined && !this.accessToken.trim()) throw new MarketplacePriceError('Mercado Libre no está configurado.');
+    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken();
     const response = await fetch(`${this.baseUrl}/items/${encodeURIComponent(itemId)}`, {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${this.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),

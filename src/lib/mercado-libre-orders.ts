@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { MarketplaceWebhookStatus, OrderStatus, Prisma } from '@prisma/client';
 import { logSystemEvent } from './logger';
+import { getMercadoLibreAccessToken } from './mercado-libre-oauth';
 import { portalDb } from './portal';
 import { createSupplierOrder } from './supplier-order-service';
 import { withDistributedLock } from './distributed-lock';
@@ -25,15 +26,16 @@ export interface MercadoLibreResourceClient {
 
 export class MercadoLibreOrderClient implements MercadoLibreResourceClient {
   constructor(
-    private readonly accessToken = process.env.MERCADO_LIBRE_ACCESS_TOKEN || '',
+    private readonly accessToken?: string,
     private readonly baseUrl = process.env.MERCADO_LIBRE_API_BASE_URL || 'https://api.mercadolibre.com',
   ) {}
 
   async get(resource: string) {
     if (!resourcePattern.test(resource)) throw new Error('Recurso de Mercado Libre inválido.');
-    if (!this.accessToken.trim()) throw new Error('Mercado Libre no está configurado.');
+    if (this.accessToken !== undefined && !this.accessToken.trim()) throw new Error('Mercado Libre no está configurado.');
+    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken();
     const response = await fetch(`${this.baseUrl}${resource}`, {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!response.ok) throw new Error(`Mercado Libre rechazó la consulta del recurso (HTTP ${response.status}).`);
     const data: unknown = await response.json();

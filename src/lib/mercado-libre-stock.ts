@@ -1,3 +1,5 @@
+import { getMercadoLibreAccessToken } from './mercado-libre-oauth';
+
 export interface MarketplaceStockClient {
   updateAvailableQuantity(marketplaceItemId: string, quantity: number): Promise<void>;
 }
@@ -17,7 +19,7 @@ function validateQuantity(quantity: number) {
 
 export class MercadoLibreStockClient implements MarketplaceStockClient {
   constructor(
-    private readonly accessToken = process.env.MERCADO_LIBRE_ACCESS_TOKEN || '',
+    private readonly accessToken?: string,
     private readonly baseUrl = process.env.MERCADO_LIBRE_API_BASE_URL || 'https://api.mercadolibre.com',
   ) {}
 
@@ -25,12 +27,13 @@ export class MercadoLibreStockClient implements MarketplaceStockClient {
     const itemId = marketplaceItemId.trim();
     if (!itemId) throw new MarketplaceStockError('La publicación no tiene ID de Mercado Libre.');
     validateQuantity(quantity);
-    if (!this.accessToken.trim()) throw new MarketplaceStockError('Mercado Libre no está configurado.');
+    if (this.accessToken !== undefined && !this.accessToken.trim()) throw new MarketplaceStockError('Mercado Libre no está configurado.');
+    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken();
 
     const response = await fetch(`${this.baseUrl}/items/${encodeURIComponent(itemId)}`, {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${this.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ available_quantity: quantity }),

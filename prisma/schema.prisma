@@ -30,6 +30,30 @@ model DropshippingSettings {
   updatedAt            DateTime @updatedAt
 }
 
+model MarketplaceOAuthCredential {
+  accountId             String    @id
+  marketplace           String    @default("MERCADO_LIBRE")
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String
+  tokenType             String    @default("bearer")
+  scope                 String?
+  expiresAt             DateTime
+  lastRefreshAt         DateTime?
+  lastRefreshError      String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([marketplace, expiresAt])
+}
+
+model MarketplaceOAuthState {
+  stateHash String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
 model Supplier {
   id                 String                  @id @default(cuid())
   name               String

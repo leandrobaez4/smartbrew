@@ -1,4 +1,5 @@
 import { portalDb } from './portal';
+import { getMercadoLibreAccessToken } from './mercado-libre-oauth';
 import { calculateSupplierProductPricing } from './supplier-product-pricing';
 
 export type MercadoLibreFeeQuote = {
@@ -37,12 +38,13 @@ export function parseMercadoLibreFeeQuote(payload: unknown, listingTypeId: strin
 
 export class MercadoLibreFeeClient {
   constructor(
-    private readonly accessToken = process.env.MERCADO_LIBRE_ACCESS_TOKEN || '',
+    private readonly accessToken?: string,
     private readonly baseUrl = process.env.MERCADO_LIBRE_API_BASE_URL || 'https://api.mercadolibre.com',
   ) {}
 
   async quote(input: { categoryId: string; priceArs: number; listingTypeId: string }) {
-    if (!this.accessToken.trim()) throw new Error('Mercado Libre no está configurado.');
+    if (this.accessToken !== undefined && !this.accessToken.trim()) throw new Error('Mercado Libre no está configurado.');
+    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken();
     if (!/^MLA\d+$/.test(input.categoryId) || !Number.isFinite(input.priceArs) || input.priceArs <= 0) {
       throw new Error('Faltan datos válidos para consultar la comisión.');
     }
@@ -53,7 +55,7 @@ export class MercadoLibreFeeClient {
       listing_type_id: input.listingTypeId,
     });
     const response = await fetch(`${this.baseUrl}/sites/MLA/listing_prices?${query}`, {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!response.ok) throw new Error(`Mercado Libre rechazó la consulta de comisión (HTTP ${response.status}).`);
     return parseMercadoLibreFeeQuote(await response.json(), input.listingTypeId);

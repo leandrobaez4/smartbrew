@@ -1,3 +1,5 @@
+import { getMercadoLibreAccessToken } from './mercado-libre-oauth';
+
 export type MarketplacePublicationInput = {
   title: string;
   description: string;
@@ -26,16 +28,17 @@ function safeProviderError(status: number) {
 
 export class MercadoLibrePublisher implements MarketplacePublisher {
   constructor(
-    private readonly accessToken = process.env.MERCADO_LIBRE_ACCESS_TOKEN || '',
+    private readonly accessToken?: string,
     private readonly baseUrl = process.env.MERCADO_LIBRE_API_BASE_URL || 'https://api.mercadolibre.com',
   ) {}
 
   private async request(path: string, body: unknown) {
-    if (!this.accessToken.trim()) throw new MarketplacePublicationError('Mercado Libre no está configurado.');
+    if (this.accessToken !== undefined && !this.accessToken.trim()) throw new MarketplacePublicationError('Mercado Libre no está configurado.');
+    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken();
     return fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${this.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
