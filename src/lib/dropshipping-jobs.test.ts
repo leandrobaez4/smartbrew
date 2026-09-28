@@ -20,6 +20,7 @@ function store() {
 function handlers() {
   return {
     syncSuppliers: vi.fn().mockResolvedValue({ processed: 1 }),
+    monitorPublishedSupplierProducts: vi.fn().mockResolvedValue({ inspected: 1 }),
     syncMarketplaceStock: vi.fn().mockResolvedValue({ synchronized: 1 }),
     syncMarketplacePrices: vi.fn().mockResolvedValue({ updated: 1 }),
     syncMarketplaceFees: vi.fn().mockResolvedValue({ updated: 1 }),
@@ -102,6 +103,23 @@ describe('dropshipping jobs', () => {
     expect(database.jobExecution.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: JobStatus.SUCCEEDED, attemptCount: 1 }),
     }));
+  });
+
+  it('uses targeted published-product monitoring for supplier price and stock jobs', async () => {
+    const database = store();
+    const operations = handlers();
+    for (const name of [DropshippingJobName.SupplierPriceSyncJob, DropshippingJobName.SupplierStockSyncJob]) {
+      await executeDropshippingJob({
+        name,
+        id: `bull-${name}`,
+        data: { executionId: 'execution-1', supplierId: 'supplier-1' },
+        attemptsMade: 0,
+        opts: { attempts: 4 },
+      } as never, { handlers: operations as never, store: database as never, withLock });
+    }
+    expect(operations.monitorPublishedSupplierProducts).toHaveBeenCalledTimes(2);
+    expect(operations.monitorPublishedSupplierProducts).toHaveBeenCalledWith({ supplierId: 'supplier-1' });
+    expect(operations.syncSuppliers).not.toHaveBeenCalled();
   });
 
   it('keeps automatic marketplace price updates disabled with the safe default', async () => {

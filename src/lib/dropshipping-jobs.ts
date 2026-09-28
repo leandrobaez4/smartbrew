@@ -11,6 +11,7 @@ import { syncMarketplaceFees } from './mercado-libre-fees';
 import { syncMarketplacePrices } from './supplier-price-sync';
 import { syncMarketplaceStock } from './supplier-stock-sync';
 import { syncSupplierOrderStatuses } from './supplier-order-status-sync';
+import { monitorPublishedSupplierProducts } from './suppliers/monitor';
 import { syncSuppliers } from './suppliers/sync';
 
 export const DropshippingJobName = {
@@ -94,6 +95,7 @@ export async function enqueueDropshippingJob(
 
 type JobHandlers = {
   syncSuppliers: typeof syncSuppliers;
+  monitorPublishedSupplierProducts: typeof monitorPublishedSupplierProducts;
   syncMarketplaceStock: typeof syncMarketplaceStock;
   syncMarketplacePrices: typeof syncMarketplacePrices;
   syncMarketplaceFees: typeof syncMarketplaceFees;
@@ -104,6 +106,7 @@ type JobHandlers = {
 
 const defaultHandlers: JobHandlers = {
   syncSuppliers,
+  monitorPublishedSupplierProducts,
   syncMarketplaceStock,
   syncMarketplacePrices,
   syncMarketplaceFees,
@@ -157,11 +160,14 @@ export async function executeDropshippingJob(
     const runWithLock = dependencies.withLock || withDistributedLock;
     const output = await runWithLock(dropshippingJobLockKey(name, job.data), async () => {
       switch (name) {
-      case DropshippingJobName.SupplierCatalogSyncJob:
+      case DropshippingJobName.SupplierCatalogSyncJob: {
+        const data = syncJob.parse(job.data);
+        return handlers.syncSuppliers({ supplierId: data.supplierId });
+      }
       case DropshippingJobName.SupplierStockSyncJob:
       case DropshippingJobName.SupplierPriceSyncJob: {
         const data = syncJob.parse(job.data);
-        return handlers.syncSuppliers({ supplierId: data.supplierId });
+        return handlers.monitorPublishedSupplierProducts({ supplierId: data.supplierId });
       }
       case DropshippingJobName.MarketplaceStockSyncJob:
       {
