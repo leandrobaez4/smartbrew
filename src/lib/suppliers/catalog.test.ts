@@ -109,4 +109,33 @@ describe('supplier catalog import mapping', () => {
     expect(result.historyCreated).toBe(0);
     expect(db.createHistory).not.toHaveBeenCalled();
   });
+
+  it('stores normalized pricing components in history without provider-specific mapping', async () => {
+    db.createHistory.mockClear();
+    db.findMany.mockResolvedValueOnce([{ id: 'stored-1', externalId: 'ext-1', cost: 100, stock: 5 }]);
+
+    await importSupplierProducts('supplier-1', [{
+      externalId: 'ext-1',
+      title: 'Precio actualizado',
+      cost: 130,
+      stock: 5,
+      rawData: {},
+      pricing: {
+        supplierCurrency: 'USD',
+        supplierPriceUsd: 0.08,
+        exchangeRateArsPerUsd: 1_500,
+        vatPercentage: 21,
+        internalTaxAmountArs: 10,
+        supplierCostWithTaxesArs: 130,
+      },
+    }], syncedAt);
+
+    expect(db.createHistory).toHaveBeenCalledWith({ data: expect.objectContaining({
+      supplierProductId: 'stored-1',
+      supplierCurrency: 'USD',
+      exchangeRateArsPerUsd: 1_500,
+      internalTaxAmountArs: 10,
+      supplierCostWithTaxesArs: 130,
+    }) });
+  });
 });

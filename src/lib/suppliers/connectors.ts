@@ -15,6 +15,14 @@ export type SupplierProduct = {
   stock?: number | null;
   images?: string[];
   attributes?: Record<string, unknown> | null;
+  pricing?: {
+    supplierCurrency?: string | null;
+    supplierPriceUsd?: number | null;
+    exchangeRateArsPerUsd?: number | null;
+    vatPercentage?: number | null;
+    internalTaxAmountArs?: number | null;
+    supplierCostWithTaxesArs?: number | null;
+  };
   rawData: unknown;
 };
 
@@ -54,6 +62,9 @@ export type SupplierConnectorConfig = {
   connectorKey?: string;
   website?: string | null;
   apiUrl?: string | null;
+  sourceSnapshot?: unknown;
+  normalizedCostArs?: number;
+  normalizedPricing?: SupplierProduct['pricing'];
   credentials?: Readonly<{
     apiKey?: string;
     apiSecret?: string;

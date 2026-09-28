@@ -39,13 +39,27 @@ export const ElitImportProductSchema = z.object({
 
 export type ElitImportProduct = z.infer<typeof ElitImportProductSchema>;
 
+export const ElitImportCommandSchema = z.object({
+  version: z.literal(1),
+  command: z.literal('IMPORT_SUPPLIER_PRODUCT'),
+  supplierSlug: z.literal('elit'),
+  externalId: z.string().regex(/^\d{1,20}$/),
+  snapshot: ElitImportProductSchema,
+}).refine((value) => value.externalId === value.snapshot.externalId, {
+  message: 'El producto no coincide con el comando de importación.',
+  path: ['externalId'],
+});
+
 export function decodeElitImportPayload(payload: string) {
   if (!payload || payload.length > 40_000 || !/^[A-Za-z0-9_-]+$/.test(payload)) return null;
   try {
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
     const json = Buffer.from(normalized, 'base64').toString('utf8');
-    const parsed = ElitImportProductSchema.safeParse(JSON.parse(json));
-    return parsed.success ? parsed.data : null;
+    const decoded: unknown = JSON.parse(json);
+    const command = ElitImportCommandSchema.safeParse(decoded);
+    if (command.success) return command.data.snapshot;
+    const legacy = ElitImportProductSchema.safeParse(decoded);
+    return legacy.success ? legacy.data : null;
   } catch {
     return null;
   }

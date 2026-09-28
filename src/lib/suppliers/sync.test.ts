@@ -2,6 +2,7 @@ import { SupplierIntegrationType, SupplierStatus } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { SupplierConnector, SupplierConnectorFactory } from './connectors';
 import { registerMockSupplierConnector } from './mock';
+import { registerElitSnapshotConnector } from './elit-snapshot';
 import { supplierSyncIntervalMs, syncSuppliers } from './sync';
 
 function supplier(id: string) {
@@ -70,6 +71,20 @@ describe('supplier catalog synchronization', () => {
     expect(supplierSyncIntervalMs('5')).toBe(5 * 60_000);
     expect(() => supplierSyncIntervalMs('0')).toThrow('SUPPLIER_SYNC_INTERVAL');
     expect(() => supplierSyncIntervalMs('1.5')).toThrow('SUPPLIER_SYNC_INTERVAL');
+  });
+
+  it('skips a product-only extension connector during catalog synchronization', async () => {
+    const integrationLogger = { info: vi.fn().mockResolvedValue(undefined), error: vi.fn().mockResolvedValue(undefined) };
+    const factory = registerElitSnapshotConnector(new SupplierConnectorFactory(integrationLogger));
+    const elit = { ...supplier('elit-supplier'), type: 'elit-snapshot-v1', integrationType: SupplierIntegrationType.SCRAPING };
+    const store = { supplier: { findMany: vi.fn().mockResolvedValue([elit]) } };
+    const importProducts = vi.fn();
+    const logger = vi.fn().mockResolvedValue(undefined);
+
+    const result = await syncSuppliers({ store: store as never, factory, logger, importProducts });
+
+    expect(result).toMatchObject({ processed: 1, succeeded: 0, failed: 0, skipped: 1 });
+    expect(importProducts).not.toHaveBeenCalled();
   });
 
   it.each([

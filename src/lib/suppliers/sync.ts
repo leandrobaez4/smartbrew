@@ -4,12 +4,15 @@ import { portalDb } from '../portal';
 import { openSupplierCredential } from '../supplier-credentials';
 import { importSupplierProducts } from './catalog';
 import { SupplierConnectorFactory } from './connectors';
+import { registerElitSnapshotConnector } from './elit-snapshot';
 import { registerMockSupplierConnector } from './mock';
 
 type SupplierStore = Pick<typeof portalDb, 'supplier'>;
 type SyncLogger = typeof logSystemEvent;
 
-export const supplierConnectorFactory = registerMockSupplierConnector(new SupplierConnectorFactory());
+export const supplierConnectorFactory = registerElitSnapshotConnector(
+  registerMockSupplierConnector(new SupplierConnectorFactory()),
+);
 
 function credential(value: string | null, supplierId: string, field: string) {
   return value ? openSupplierCredential(value, supplierId, field) : undefined;
@@ -20,7 +23,7 @@ export function supplierConnectorConfig(supplier: Supplier) {
     supplierId: supplier.id,
     slug: supplier.slug,
     integrationType: supplier.integrationType,
-    connectorKey: supplier.type?.trim().toLowerCase() === 'mock' ? 'mock' : undefined,
+    connectorKey: supplier.type?.trim().toLowerCase() || undefined,
     website: supplier.website,
     apiUrl: supplier.apiUrl,
     credentials: {
@@ -55,11 +58,21 @@ export async function syncSuppliers(options: {
     where: { status: 'ACTIVE', ...(options.supplierId ? { id: options.supplierId } : {}) },
     orderBy: { name: 'asc' },
   });
-  const results: Array<{ supplierId: string; slug: string; status: 'success' | 'failed'; imported?: number; error?: string }> = [];
+  const results: Array<{ supplierId: string; slug: string; status: 'success' | 'failed' | 'skipped'; imported?: number; error?: string }> = [];
 
   for (const supplier of suppliers) {
     try {
-      const products = await factory.make(supplierConnectorConfig(supplier)).getProducts();
+      const connector = factory.make(supplierConnectorConfig(supplier));
+      if (!connector.supports('catalog')) {
+        results.push({ supplierId: supplier.id, slug: supplier.slug, status: 'skipped' });
+        await logger('INFO', 'supplier_sync', 'Supplier skipped because its connector has no catalog capability', {
+          supplierId: supplier.id,
+          supplierSlug: supplier.slug,
+          connectorKey: connector.connectorKey,
+        });
+        continue;
+      }
+      const products = await connector.getProducts();
       const imported = await importProducts(supplier.id, products);
       results.push({ supplierId: supplier.id, slug: supplier.slug, status: 'success', imported: imported.imported });
       await logger('INFO', 'supplier_sync', 'Supplier catalog synchronized', {
@@ -84,6 +97,7 @@ export async function syncSuppliers(options: {
     processed: results.length,
     succeeded: results.filter((result) => result.status === 'success').length,
     failed: results.filter((result) => result.status === 'failed').length,
+    skipped: results.filter((result) => result.status === 'skipped').length,
     results,
   };
   await logger(summary.failed ? 'WARN' : 'INFO', 'supplier_sync', 'Supplier catalog synchronization finished', summary);

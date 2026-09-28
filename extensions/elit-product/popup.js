@@ -1,4 +1,4 @@
-import { canConfigureProduct, extractCurrentProduct } from './run.mjs';
+import { canConfigureProduct, createImportCommand, extractCurrentProduct } from './run.mjs';
 
 const extract = document.querySelector('#extract');
 const copy = document.querySelector('#copy');
@@ -38,7 +38,7 @@ send.addEventListener('click', async () => {
   if (!extractedProduct) return;
   send.disabled = true;
   const url = new URL('https://www.smartbrew.tech/admin/suppliers/elit-import');
-  url.searchParams.set('payload', encodePayload(extractedProduct));
+  url.searchParams.set('payload', encodePayload(createImportCommand(extractedProduct)));
   try {
     await chrome.tabs.create({ url: url.href });
     status.textContent = 'SmartBrew abierto para revisar los cálculos y confirmar el guardado.';

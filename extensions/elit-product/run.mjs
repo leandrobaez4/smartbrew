@@ -4,6 +4,17 @@ export function canConfigureProduct(product) {
   return Boolean(product && typeof product === 'object' && product.externalId && product.title);
 }
 
+export function createImportCommand(product) {
+  if (!canConfigureProduct(product)) throw new Error('No hay un producto válido para importar.');
+  return {
+    version: 1,
+    command: 'IMPORT_SUPPLIER_PRODUCT',
+    supplierSlug: 'elit',
+    externalId: product.externalId,
+    snapshot: product,
+  };
+}
+
 export async function withDeadline(promise, milliseconds, message) {
   let timer;
   try {

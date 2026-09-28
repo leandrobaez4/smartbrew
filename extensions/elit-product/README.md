@@ -14,7 +14,7 @@ La extensión extrae desde la pestaña activa los datos del producto y abre una 
 
 El botón **Configurar en SmartBrew** se habilita después de cualquier extracción válida. Si Elit no expone el precio o el tipo de cambio, esos campos se abren en cero para completarlos manualmente en SmartBrew.
 
-El traspaso abre SmartBrew con el producto codificado en la URL. No incluye cookies ni credenciales, pero los datos del producto y su costo pueden quedar visibles en el historial del navegador y en registros de navegación.
+El traspaso abre SmartBrew con un comando versionado que identifica al proveedor, el producto y el snapshot extraído. SmartBrew lo valida y lo procesa con el mismo Adapter, Factory y pipeline de importación que usan los demás proveedores. No incluye cookies ni credenciales, pero los datos del producto y su costo pueden quedar visibles en el historial del navegador y en registros de navegación.
 
 ## Cálculo en SmartBrew
 

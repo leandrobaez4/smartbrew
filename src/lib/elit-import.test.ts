@@ -19,6 +19,30 @@ describe('Elit import payload', () => {
     expect(decodeElitImportPayload(encoded)?.externalId).toBe('6358');
   });
 
+  it('decodes the versioned supplier import command sent by the extension', () => {
+    const command = {
+      version: 1,
+      command: 'IMPORT_SUPPLIER_PRODUCT',
+      supplierSlug: 'elit',
+      externalId: product.externalId,
+      snapshot: product,
+    };
+    const encoded = Buffer.from(JSON.stringify(command)).toString('base64url');
+    expect(decodeElitImportPayload(encoded)?.title).toBe('Auricular');
+  });
+
+  it('rejects a command whose identity does not match its snapshot', () => {
+    const command = {
+      version: 1,
+      command: 'IMPORT_SUPPLIER_PRODUCT',
+      supplierSlug: 'elit',
+      externalId: '9999',
+      snapshot: product,
+    };
+    const encoded = Buffer.from(JSON.stringify(command)).toString('base64url');
+    expect(decodeElitImportPayload(encoded)).toBeNull();
+  });
+
   it('rejects unexpected origins and image hosts', () => {
     expect(ElitImportProductSchema.safeParse({ ...product, sourceUrl: 'https://evil.test/producto/6358' }).success).toBe(false);
     expect(ElitImportProductSchema.safeParse({ ...product, images: ['https://evil.test/image.jpg'] }).success).toBe(false);

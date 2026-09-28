@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canConfigureProduct, extractCurrentProduct } from './run.mjs';
+import { canConfigureProduct, createImportCommand, extractCurrentProduct } from './run.mjs';
 
 const deadlines = { tab: 10, extraction: 10 };
 
@@ -9,6 +9,17 @@ test('allows configuration when pricing must be completed in SmartBrew', () => {
     supplierPriceUsd: null,
     exchangeRateArsPerUsd: null,
   } }), true);
+});
+
+test('builds a versioned command for the shared supplier import pipeline', () => {
+  const product = { externalId: '6358', title: 'Auricular' };
+  assert.deepEqual(createImportCommand(product), {
+    version: 1,
+    command: 'IMPORT_SUPPLIER_PRODUCT',
+    supplierSlug: 'elit',
+    externalId: '6358',
+    snapshot: product,
+  });
 });
 
 test('extracts from the active Elit product tab and reports both stages', async () => {

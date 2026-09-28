@@ -32,19 +32,22 @@ export function supplierProductData(product: SupplierProduct, syncedAt: Date) {
 
 export async function importSupplierProducts(supplierId: string, products: SupplierProduct[], syncedAt = new Date()) {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(supplierId)) throw new Error('Invalid supplier id');
-  const uniqueProducts = new Map<string, ReturnType<typeof supplierProductData>>();
+  const uniqueProducts = new Map<string, {
+    data: ReturnType<typeof supplierProductData>;
+    pricing: SupplierProduct['pricing'];
+  }>();
   for (const product of products) {
     const data = supplierProductData(product, syncedAt);
-    uniqueProducts.set(data.externalId, data);
+    uniqueProducts.set(data.externalId, { data, pricing: product.pricing });
   }
 
   const incoming = [...uniqueProducts.values()];
   const existingProducts = incoming.length ? await portalDb.supplierProduct.findMany({
-    where: { supplierId, externalId: { in: incoming.map((product) => product.externalId) } },
+    where: { supplierId, externalId: { in: incoming.map(({ data }) => data.externalId) } },
     select: { id: true, externalId: true, cost: true, stock: true },
   }) : [];
   const existingByExternalId = new Map(existingProducts.map((product) => [product.externalId, product]));
-  const historyOperations = incoming.flatMap((data) => {
+  const historyOperations = incoming.flatMap(({ data, pricing }) => {
     const previous = existingByExternalId.get(data.externalId);
     if (!previous) return [];
     const previousCost = previous.cost == null ? null : Number(previous.cost);
@@ -55,13 +58,21 @@ export async function importSupplierProducts(supplierId: string, products: Suppl
         supplierProductId: previous.id,
         cost: data.cost,
         stock: data.stock,
+        ...(pricing ? {
+          supplierCurrency: pricing.supplierCurrency,
+          supplierPriceUsd: pricing.supplierPriceUsd,
+          exchangeRateArsPerUsd: pricing.exchangeRateArsPerUsd,
+          vatPercentage: pricing.vatPercentage,
+          internalTaxAmountArs: pricing.internalTaxAmountArs,
+          supplierCostWithTaxesArs: pricing.supplierCostWithTaxesArs,
+        } : {}),
         createdAt: syncedAt,
       },
     })];
   });
 
   await portalDb.$transaction(
-    [...historyOperations, ...incoming.map((data) => portalDb.supplierProduct.upsert({
+    [...historyOperations, ...incoming.map(({ data }) => portalDb.supplierProduct.upsert({
       where: { supplierId_externalId: { supplierId, externalId: data.externalId } },
       create: { supplierId, ...data },
       update: data,
