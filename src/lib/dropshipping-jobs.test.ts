@@ -155,6 +155,24 @@ describe('dropshipping jobs', () => {
     }));
   });
 
+  it('propagates a total supplier monitoring failure so the queue can retry it', async () => {
+    const database = store();
+    const operations = handlers();
+    operations.monitorPublishedSupplierProducts.mockRejectedValue(new Error('all supplier requests failed'));
+
+    await expect(executeDropshippingJob({
+      id: 'supplier-price-job',
+      name: DropshippingJobName.SupplierPriceSyncJob,
+      data: { executionId: 'execution-1' },
+      attemptsMade: 0,
+      opts: { attempts: 4 },
+    } as never, { handlers: operations as never, store: database as never, withLock })).rejects.toThrow('all supplier requests failed');
+
+    expect(database.jobExecution.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: JobStatus.STARTED, attemptCount: 1, finishedAt: null }),
+    }));
+  });
+
   it('creates persistent execution tracking for scheduler-generated jobs', async () => {
     const database = store();
     const operations = handlers();

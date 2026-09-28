@@ -136,5 +136,8 @@ export async function monitorPublishedSupplierProducts(options: {
     results,
   };
   await logger(summary.failed ? 'WARN' : 'INFO', 'supplier_product_monitor', 'Published supplier product monitoring finished', summary);
+  if (summary.inspected > 0 && summary.failed === summary.inspected) {
+    throw new Error('All published supplier product synchronizations failed.');
+  }
   return summary;
 }

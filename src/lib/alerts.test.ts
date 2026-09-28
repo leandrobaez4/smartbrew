@@ -17,6 +17,7 @@ describe('alerts', () => {
   it.each([
     ['supplier_sync', AlertType.SUPPLIER_API_ERROR],
     ['supplier_integration', AlertType.SUPPLIER_API_ERROR],
+    ['supplier_product_monitor', AlertType.SUPPLIER_API_ERROR],
     ['supplier_order_status_sync', AlertType.SUPPLIER_API_ERROR],
     ['supplier_order', AlertType.ORDER_CREATION_ERROR],
     ['marketplace_stock_sync', AlertType.MARKETPLACE_SYNC_ERROR],

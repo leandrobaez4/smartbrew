@@ -107,4 +107,26 @@ describe('published supplier product monitoring', () => {
       externalId: '1',
     }));
   });
+
+  it('fails the job after logging the summary when every monitored product fails', async () => {
+    const getProduct = vi.fn().mockRejectedValue(new Error('provider unavailable'));
+    const factory = new SupplierConnectorFactory({ info: vi.fn(), error: vi.fn() }).register({
+      key: 'targeted', capabilities: ['product'], builder: () => connector(getProduct),
+    });
+    const store = { marketplaceListing: { findMany: vi.fn().mockResolvedValue([listedProduct('product-1')]) } };
+    const logger = vi.fn().mockResolvedValue(undefined);
+
+    await expect(monitorPublishedSupplierProducts({
+      store: store as never,
+      factory,
+      importProducts: vi.fn(),
+      logger,
+      syncedAt,
+    })).rejects.toThrow('All published supplier product synchronizations failed.');
+
+    expect(logger).toHaveBeenLastCalledWith(
+      'WARN', 'supplier_product_monitor', 'Published supplier product monitoring finished',
+      expect.objectContaining({ inspected: 1, succeeded: 0, failed: 1 }),
+    );
+  });
 });

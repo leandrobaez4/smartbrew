@@ -45,7 +45,9 @@ export function alertFromSystemEvent(
 ): AlertInput | null {
   let type = alertSources[source];
   if (!type && level === 'ERROR') {
-    if (source === 'supplier_sync' || source === 'supplier_integration' || source === 'supplier_order_status_sync') type = AlertType.SUPPLIER_API_ERROR;
+    if (source === 'supplier_sync' || source === 'supplier_integration' || source === 'supplier_product_monitor' || source === 'supplier_order_status_sync') {
+      type = AlertType.SUPPLIER_API_ERROR;
+    }
     else if (source === 'supplier_order') type = AlertType.ORDER_CREATION_ERROR;
     else if (source.startsWith('marketplace_') || source.startsWith('mercado_libre_')) type = AlertType.MARKETPLACE_SYNC_ERROR;
   }
