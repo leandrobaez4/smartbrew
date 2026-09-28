@@ -61,5 +61,5 @@ export async function importElitProductAction(payload: string, formData: FormDat
     });
     return supplierProduct;
   });
-  redirect(`/dashboard/opportunities/${saved.id}?imported=1`);
+  redirect(`/admin/opportunities/${saved.id}?imported=1`);
 }

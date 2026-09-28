@@ -1,4 +1,4 @@
-const allowedAdminPaths = ['/admin/', '/dashboard/'];
+const allowedAdminPaths = ['/admin/'];
 
 export function normalizeAdminReturnTo(value: unknown) {
   if (typeof value !== 'string' || value.length > 50_000 || value.includes('\\')) return null;

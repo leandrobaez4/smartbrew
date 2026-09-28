@@ -20,15 +20,15 @@ export default async function DropshippingDashboardPage({ searchParams }: {
   const period = parseDashboardPeriod(typeof params.period === 'string' ? params.period : undefined);
   const metrics = await getDropshippingDashboard(period);
   const cards = [
-    ['Productos activos', number(metrics.activeProducts), '/dashboard/opportunities'],
+    ['Productos activos', number(metrics.activeProducts), '/admin/opportunities'],
     ['Proveedores activos', number(metrics.activeSuppliers), '/admin/suppliers'],
-    ['Publicaciones activas', number(metrics.marketplaceListings), '/dashboard/opportunities'],
+    ['Publicaciones activas', number(metrics.marketplaceListings), '/admin/opportunities'],
     ['Órdenes de hoy', number(metrics.ordersToday), '/admin/orders'],
-    ['Revenue', money(metrics.revenue), `/dashboard/dropshipping/profitability?period=${period}`],
-    ['Ganancia estimada', money(metrics.estimatedProfit), `/dashboard/dropshipping/profitability?period=${period}`],
-    ['Margen promedio', `${number(metrics.averageMargin)}%`, `/dashboard/dropshipping/profitability?period=${period}`],
-    ['Productos pausados', number(metrics.productsPaused), '/dashboard/opportunities?status=PAUSED'],
-    ['Productos sin stock', number(metrics.productsWithoutStock), '/dashboard/opportunities?minimumStock=0'],
+    ['Revenue', money(metrics.revenue), `/admin/dropshipping/profitability?period=${period}`],
+    ['Ganancia estimada', money(metrics.estimatedProfit), `/admin/dropshipping/profitability?period=${period}`],
+    ['Margen promedio', `${number(metrics.averageMargin)}%`, `/admin/dropshipping/profitability?period=${period}`],
+    ['Productos pausados', number(metrics.productsPaused), '/admin/opportunities?status=PAUSED'],
+    ['Productos sin stock', number(metrics.productsWithoutStock), '/admin/opportunities?minimumStock=0'],
     ['Errores de proveedor', number(metrics.supplierErrors), `/admin/logs?status=ERROR&period=${period}`],
   ] as const;
 

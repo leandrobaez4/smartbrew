@@ -40,7 +40,7 @@ export default async function ProfitabilityPage({ searchParams }: {
   return <div className="mx-auto max-w-[1600px]">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link href={`/dashboard/dropshipping?period=${period}`} className="text-sm font-semibold text-blue-600 dark:text-blue-400">← Dashboard</Link>
+          <Link href={`/admin/dropshipping?period=${period}`} className="text-sm font-semibold text-blue-600 dark:text-blue-400">← Dashboard</Link>
           <h1 className="mt-2 text-2xl font-bold">Rentabilidad</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Snapshots financieros de órdenes desde {report.from.toLocaleDateString('es-AR')}.</p>
         </div>

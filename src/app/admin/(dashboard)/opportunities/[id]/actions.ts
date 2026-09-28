@@ -17,25 +17,25 @@ const lines = (value: FormDataEntryValue | null) => String(value || '')
   .filter(Boolean);
 
 function path(id: string, key: 'saved' | 'generated' | 'error') {
-  return `/dashboard/opportunities/${id}?${key}=1`;
+  return `/admin/opportunities/${id}?${key}=1`;
 }
 
 export async function generateSupplierEditorialAction(id: string) {
   await requireAdmin();
-  if (!validId(id)) redirect('/dashboard/opportunities');
+  if (!validId(id)) redirect('/admin/opportunities');
   try {
     await generateAndSaveSupplierProductEditorial(id, portalDb);
   } catch {
     redirect(path(id, 'error'));
   }
-  revalidatePath('/dashboard/opportunities');
-  revalidatePath(`/dashboard/opportunities/${id}`);
+  revalidatePath('/admin/opportunities');
+  revalidatePath(`/admin/opportunities/${id}`);
   redirect(path(id, 'generated'));
 }
 
 export async function approveSupplierEditorialAction(id: string, formData: FormData) {
   await requireAdmin();
-  if (!validId(id)) redirect('/dashboard/opportunities');
+  if (!validId(id)) redirect('/admin/opportunities');
   const parsed = SupplierProductEditorialSchema.safeParse({
     title: formData.get('title'),
     description: formData.get('description'),
@@ -57,14 +57,14 @@ export async function approveSupplierEditorialAction(id: string, formData: FormD
       editorialReviewedAt: new Date(),
     },
   });
-  revalidatePath('/dashboard/opportunities');
-  revalidatePath(`/dashboard/opportunities/${id}`);
+  revalidatePath('/admin/opportunities');
+  revalidatePath(`/admin/opportunities/${id}`);
   redirect(path(id, 'saved'));
 }
 
 export async function updateSupplierProductPricingAction(id: string, formData: FormData) {
   await requireAdmin();
-  if (!validId(id)) redirect('/dashboard/opportunities');
+  if (!validId(id)) redirect('/admin/opportunities');
   const parsed = SupplierProductPricingSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirect(path(id, 'error'));
   const pricing = calculateSupplierProductPricing(parsed.data);
@@ -76,7 +76,7 @@ export async function updateSupplierProductPricingAction(id: string, formData: F
       update: { ...pricing, marketplaceFeeSyncedAt: null },
     }),
   ]);
-  revalidatePath('/dashboard/opportunities');
-  revalidatePath(`/dashboard/opportunities/${id}`);
-  redirect(`/dashboard/opportunities/${id}?pricingSaved=1`);
+  revalidatePath('/admin/opportunities');
+  revalidatePath(`/admin/opportunities/${id}`);
+  redirect(`/admin/opportunities/${id}?pricingSaved=1`);
 }
