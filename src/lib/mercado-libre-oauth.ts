@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { withDistributedLock } from './distributed-lock';
 import { portalDb } from './portal';
-import { openSupplierCredential, sealSupplierCredential } from './supplier-credentials';
+import { openSupplierCredential, sealSupplierCredential, supplierCredentialEncryptionConfigured } from './supplier-credentials';
 
 const tokenSchema = z.object({
   access_token: z.string().min(10),
@@ -15,14 +15,29 @@ const tokenSchema = z.object({
 type TokenResponse = z.infer<typeof tokenSchema>;
 type CredentialStore = Pick<typeof portalDb.marketplaceOAuthCredential, 'findFirst' | 'findUnique' | 'upsert' | 'update'>;
 
+export function mercadoLibreOAuthConfigurationIssues() {
+  const issues: string[] = [];
+  const clientId = process.env.MERCADO_LIBRE_CLIENT_ID || process.env.MERCADO_LIBRE_APPLICATION_ID || process.env.MERCADO_LIBRE_APP_ID || '';
+  if (!clientId.trim()) issues.push('MERCADO_LIBRE_CLIENT_ID');
+  if (!(process.env.MERCADO_LIBRE_CLIENT_SECRET || '').trim()) issues.push('MERCADO_LIBRE_CLIENT_SECRET');
+  if (!supplierCredentialEncryptionConfigured()) issues.push('SUPPLIER_CREDENTIALS_ENCRYPTION_KEY');
+  try {
+    const origin = new URL(process.env.MERCADO_LIBRE_OAUTH_ORIGIN || 'https://www.smartbrew.tech');
+    if (origin.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && origin.hostname === 'localhost')) {
+      issues.push('MERCADO_LIBRE_OAUTH_ORIGIN');
+    }
+  } catch {
+    issues.push('MERCADO_LIBRE_OAUTH_ORIGIN');
+  }
+  return issues;
+}
+
 export function mercadoLibreOAuthConfig() {
-  const clientId = process.env.MERCADO_LIBRE_CLIENT_ID || process.env.MERCADO_LIBRE_APPLICATION_ID || '';
+  const clientId = process.env.MERCADO_LIBRE_CLIENT_ID || process.env.MERCADO_LIBRE_APPLICATION_ID || process.env.MERCADO_LIBRE_APP_ID || '';
   const clientSecret = process.env.MERCADO_LIBRE_CLIENT_SECRET || '';
   const origin = new URL(process.env.MERCADO_LIBRE_OAUTH_ORIGIN || 'https://www.smartbrew.tech');
-  if (!clientId.trim() || !clientSecret.trim()) throw new Error('Mercado Libre OAuth no está configurado.');
-  if (origin.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && origin.hostname === 'localhost')) {
-    throw new Error('El origen OAuth de Mercado Libre es inválido.');
-  }
+  const issues = mercadoLibreOAuthConfigurationIssues();
+  if (issues.length) throw new Error(`Mercado Libre OAuth no está configurado: ${issues.join(', ')}.`);
   return {
     clientId,
     clientSecret,
@@ -54,7 +69,12 @@ async function tokenRequest(parameters: URLSearchParams, fetcher: typeof fetch =
     signal: AbortSignal.timeout(15_000),
   });
   const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new Error('Mercado Libre rechazó la autorización. Volvé a conectar la cuenta.');
+  if (!response.ok) {
+    const details = payload && !Array.isArray(payload) && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+    const code = typeof details.error === 'string' ? details.error : 'oauth_error';
+    const description = typeof details.error_description === 'string' ? details.error_description : 'Sin detalle adicional.';
+    throw new Error(`Mercado Libre rechazó la autorización (HTTP ${response.status}, ${code}): ${description}`.slice(0, 500));
+  }
   return tokenSchema.parse(payload);
 }
 

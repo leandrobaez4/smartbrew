@@ -13,9 +13,14 @@ Configurar en el servidor:
 ```ini
 MERCADO_LIBRE_CLIENT_ID=
 MERCADO_LIBRE_CLIENT_SECRET=
+MERCADO_LIBRE_APPLICATION_ID=<mismo App ID>
 MERCADO_LIBRE_OAUTH_ORIGIN=https://www.smartbrew.tech
 SUPPLIER_CREDENTIALS_ENCRYPTION_KEY=<64 caracteres hexadecimales>
 ```
+
+`MERCADO_LIBRE_CLIENT_ID` es el App ID usado por OAuth. `MERCADO_LIBRE_APPLICATION_ID` lleva ese mismo valor y permite validar que las notificaciones recibidas pertenezcan a nuestra aplicación.
+
+La clave de cifrado puede generarse una sola vez con `openssl rand -hex 32`. Debe conservarse igual entre despliegues: cambiarla impide descifrar las credenciales ya guardadas. En Vercel, tanto esta clave como `MERCADO_LIBRE_CLIENT_SECRET` deben cargarse como secretos.
 
 Luego ingresar en `/admin/settings/mercado-libre` y elegir **Conectar Mercado Libre**.
 

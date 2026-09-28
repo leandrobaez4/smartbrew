@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMercadoLibreAccessToken, mercadoLibreAuthorizationUrl } from './mercado-libre-oauth';
+import { exchangeMercadoLibreCode, getMercadoLibreAccessToken, mercadoLibreAuthorizationUrl, mercadoLibreOAuthConfigurationIssues } from './mercado-libre-oauth';
 import { sealSupplierCredential } from './supplier-credentials';
 
 const now = new Date('2026-09-28T17:00:00Z');
 
 beforeEach(() => {
+  delete process.env.MERCADO_LIBRE_APPLICATION_ID;
+  delete process.env.MERCADO_LIBRE_APP_ID;
   process.env.MERCADO_LIBRE_CLIENT_ID = 'app-123';
   process.env.MERCADO_LIBRE_CLIENT_SECRET = 'secret-456';
   process.env.MERCADO_LIBRE_OAUTH_ORIGIN = 'https://smartbrew.test';
@@ -20,6 +22,29 @@ describe('Mercado Libre OAuth', () => {
     expect(url.searchParams.get('client_id')).toBe('app-123');
     expect(url.searchParams.get('redirect_uri')).toBe('https://smartbrew.test/api/mercado-libre/oauth/callback');
     expect(url.searchParams.get('state')).toBe(state);
+  });
+
+  it('reports a missing encryption key before starting authorization', () => {
+    delete process.env.SUPPLIER_CREDENTIALS_ENCRYPTION_KEY;
+    expect(mercadoLibreOAuthConfigurationIssues()).toContain('SUPPLIER_CREDENTIALS_ENCRYPTION_KEY');
+    expect(() => mercadoLibreAuthorizationUrl('b'.repeat(64))).toThrow('SUPPLIER_CREDENTIALS_ENCRYPTION_KEY');
+  });
+
+  it('accepts the legacy app id while the environment migrates to client id', () => {
+    delete process.env.MERCADO_LIBRE_CLIENT_ID;
+    process.env.MERCADO_LIBRE_APP_ID = 'legacy-app-123';
+    const url = new URL(mercadoLibreAuthorizationUrl('b'.repeat(64)));
+    expect(url.searchParams.get('client_id')).toBe('legacy-app-123');
+  });
+
+  it('preserves the safe Mercado Libre error details when code exchange fails', async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({
+      error: 'invalid_grant',
+      error_description: 'The authorization code is invalid or expired',
+    }, { status: 400 }));
+    await expect(exchangeMercadoLibreCode('valid-code', fetcher as never)).rejects.toThrow(
+      'HTTP 400, invalid_grant',
+    );
   });
 
   it('returns a valid encrypted access token without refreshing it', async () => {

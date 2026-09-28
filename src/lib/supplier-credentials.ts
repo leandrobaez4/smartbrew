@@ -2,9 +2,13 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 const algorithm = 'aes-256-gcm';
 
+export function supplierCredentialEncryptionConfigured() {
+  return /^[a-f0-9]{64}$/i.test(process.env.SUPPLIER_CREDENTIALS_ENCRYPTION_KEY || '');
+}
+
 function encryptionKey() {
   const value = process.env.SUPPLIER_CREDENTIALS_ENCRYPTION_KEY || '';
-  if (!/^[a-f0-9]{64}$/i.test(value)) {
+  if (!supplierCredentialEncryptionConfigured()) {
     throw new Error('Supplier credential encryption is not configured');
   }
   return Buffer.from(value, 'hex');
