@@ -60,6 +60,18 @@ describe('Unidrop browser snapshot adapter', () => {
     });
   });
 
+  it('uses the reviewed ARS cost for idempotent imports', () => {
+    expect(normalizeUnidropSnapshot(snapshot, 17_144.49, {
+      supplierCurrency: 'ARS',
+      vatPercentage: 21,
+      supplierCostWithTaxesArs: 17_144.49,
+    })).toMatchObject({
+      cost: 17_144.49,
+      currency: 'ARS',
+      pricing: { supplierCurrency: 'ARS', supplierCostWithTaxesArs: 17_144.49 },
+    });
+  });
+
   it('rejects mismatched identities, credentials-shaped fields and non-Unidrop URLs', () => {
     expect(() => normalizeUnidropSnapshot({ ...snapshot, externalId: '398:OTHER' })).toThrow('productId:SKU');
     expect(() => normalizeUnidropSnapshot({ ...snapshot, cookie: 'session=secret' })).toThrow();

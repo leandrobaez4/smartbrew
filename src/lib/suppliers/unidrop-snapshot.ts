@@ -5,7 +5,11 @@ function unavailable(): never {
   throw new Error('Operation unavailable for an imported Unidrop browser snapshot.');
 }
 
-export function normalizeUnidropSnapshot(snapshot: unknown): SupplierProduct {
+export function normalizeUnidropSnapshot(
+  snapshot: unknown,
+  normalizedCostArs?: number,
+  normalizedPricing?: SupplierProduct['pricing'],
+): SupplierProduct {
   const product = UnidropSnapshotSchema.parse(snapshot);
   return {
     externalId: product.externalId,
@@ -15,7 +19,7 @@ export function normalizeUnidropSnapshot(snapshot: unknown): SupplierProduct {
     description: product.description ?? null,
     brand: product.brand ?? null,
     category: product.category ?? null,
-    cost: product.costArs,
+    cost: normalizedCostArs ?? product.costArs,
     currency: 'ARS',
     stock: product.stock,
     images: product.images,
@@ -26,7 +30,7 @@ export function normalizeUnidropSnapshot(snapshot: unknown): SupplierProduct {
       sellerPackageWidthCm: product.package.widthCm ?? null,
       sellerPackageLengthCm: product.package.lengthCm ?? null,
     },
-    pricing: {
+    pricing: normalizedPricing ?? {
       supplierCurrency: 'ARS',
       supplierCostWithTaxesArs: product.costArs,
     },
@@ -41,10 +45,14 @@ export function normalizeUnidropSnapshot(snapshot: unknown): SupplierProduct {
 }
 
 class UnidropSnapshotConnector implements SupplierConnector {
-  constructor(private readonly snapshot: unknown) {}
+  constructor(
+    private readonly snapshot: unknown,
+    private readonly normalizedCostArs?: number,
+    private readonly normalizedPricing?: SupplierProduct['pricing'],
+  ) {}
 
   async getProduct(externalId: string) {
-    const product = normalizeUnidropSnapshot(this.snapshot);
+    const product = normalizeUnidropSnapshot(this.snapshot, this.normalizedCostArs, this.normalizedPricing);
     return externalId === product.externalId ? product : null;
   }
 
@@ -60,6 +68,10 @@ export function registerUnidropSnapshotConnector(factory: SupplierConnectorFacto
     key: 'unidrop-snapshot-v1',
     aliases: ['unidrop'],
     capabilities: ['product'],
-    builder: (config) => new UnidropSnapshotConnector(config.sourceSnapshot),
+    builder: (config) => new UnidropSnapshotConnector(
+      config.sourceSnapshot,
+      config.normalizedCostArs,
+      config.normalizedPricing,
+    ),
   });
 }

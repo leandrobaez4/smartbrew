@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { portalDb, requireAdmin } from '@/lib/portal';
 import { compareSupplierPvp, resolveSupplierPvpArs } from '@/lib/supplier-pvp-comparison';
-import PricingCalculatorForm from '@/app/admin/(dashboard)/suppliers/elit-import/PricingCalculatorForm';
+import SupplierPricingCalculatorForm from '@/app/admin/(dashboard)/suppliers/import/SupplierPricingCalculatorForm';
+import { inferVatTreatment } from '@/lib/supplier-product-pricing';
+import { supplierPackageDefaults } from '@/lib/supplier-package';
 import { approveSupplierEditorialAction, generateSupplierEditorialAction, updateSupplierProductPricingAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -71,12 +73,20 @@ export default async function SupplierProductEditorialPage({
         </dl> : <p className="mt-2 text-sm text-gray-500">La comparación estará disponible cuando el proveedor informe PVP y exista una publicación con precio sincronizado.</p>}
       </div>
       {product.pricing.marketplaceFeeSyncedAt && <p className="rounded bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Comisión de Mercado Libre consultada el {product.pricing.marketplaceFeeSyncedAt.toLocaleString('es-AR')}.</p>}
-      <PricingCalculatorForm action={updatePricing} submitLabel="Guardar cálculo" initial={{
+      <SupplierPricingCalculatorForm action={updatePricing} submitLabel="Guardar cálculo" supplierLabel={product.supplier.name} packageDefaults={supplierPackageDefaults(product)} initial={{
         supplierPriceUsd: Number(product.pricing.supplierPriceUsd),
-        supplierCurrency: 'USD',
+        supplierPriceArs: Number(product.pricing.supplierPriceArs),
+        supplierCurrency: product.pricing.supplierCurrency === 'ARS' ? 'ARS' : 'USD',
         exchangeRateArsPerUsd: Number(product.pricing.exchangeRateArsPerUsd),
+        vatTreatment: inferVatTreatment({
+          supplierCurrency: product.pricing.supplierCurrency,
+          supplierPriceArs: Number(product.pricing.supplierPriceArs),
+          supplierCostWithVatArs: Number(product.pricing.supplierCostWithVatArs),
+          vatPercentage: Number(product.pricing.vatPercentage),
+        }),
         vatPercentage: Number(product.pricing.vatPercentage),
         internalTaxAmountUsd: Number(product.pricing.internalTaxAmountUsd),
+        internalTaxAmountArs: Number(product.pricing.internalTaxAmountArs),
         supplierPvpUsd: Number(product.pricing.supplierPvpUsd || 0),
         supplierPvpArs: Number(product.pricing.supplierPvpArs || 0),
         supplierMarkupPercentage: Number(product.pricing.supplierMarkupPercentage || 0),

@@ -1,6 +1,7 @@
 import { decodeUnidropImportPayload } from '@/lib/unidrop-import';
 import { requireAdmin } from '@/lib/portal';
 import { importSupplierSnapshotAction } from './actions';
+import SupplierPricingCalculatorForm from './SupplierPricingCalculatorForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export default async function SupplierImportPage({ searchParams }: {
       <h1 className="text-2xl font-bold">Confirmar producto para SmartBrew</h1>
       <p className="mt-1 text-sm text-gray-500">Revisá el snapshot comercial antes de incorporarlo a oportunidades.</p>
     </header>
-    {query.error && <p className="rounded bg-red-50 p-3 text-sm text-red-800">El snapshot no es válido. Extraé nuevamente el producto.</p>}
+    {query.error && <p className="rounded bg-red-50 p-3 text-sm text-red-800">Revisá el snapshot y los valores del cálculo.</p>}
     <section className="grid gap-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900 md:grid-cols-2">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Producto</p>
@@ -55,8 +56,32 @@ export default async function SupplierImportPage({ searchParams }: {
         <p className="mt-3 text-xs text-gray-500">El costo de envío de Tiendanube queda sólo como referencia; no se usa como costo de Mercado Libre.</p>
       </div>
     </section>
-    <form action={save} className="flex justify-end">
-      <button className="rounded bg-yellow-500 px-5 py-3 font-semibold text-gray-950 hover:bg-yellow-400">Guardar en oportunidades</button>
-    </form>
+    <SupplierPricingCalculatorForm
+      action={save}
+      supplierLabel="Unidrop"
+      submitLabel="Guardar en oportunidades"
+      shippingReferenceArs={product.shippingReference?.amountArs}
+      packageDefaults={product.package}
+      initial={{
+        supplierPriceUsd: 0,
+        supplierPriceArs: product.costArs,
+        supplierCurrency: 'ARS',
+        exchangeRateArsPerUsd: 0,
+        vatTreatment: 'UNKNOWN',
+        vatPercentage: 21,
+        internalTaxAmountUsd: 0,
+        internalTaxAmountArs: 0,
+        supplierPvpUsd: 0,
+        supplierPvpArs: product.priceWithProfitArs ?? 0,
+        supplierMarkupPercentage: 0,
+        productSearchCostArs: 0,
+        shippingCostArs: 0,
+        marketplaceFeePercentage: 13,
+        marketplaceFixedFeeArs: 0,
+        marketplaceCategoryId: '',
+        marketplaceListingTypeId: 'gold_special',
+        targetMarginPercentage: 20,
+      }}
+    />
   </main>;
 }

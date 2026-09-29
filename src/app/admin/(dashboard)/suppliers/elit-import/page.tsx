@@ -1,6 +1,6 @@
 import { requireAdmin } from '@/lib/portal';
 import { decodeElitImportPayload } from '@/lib/elit-import';
-import PricingCalculatorForm from './PricingCalculatorForm';
+import SupplierPricingCalculatorForm from '../import/SupplierPricingCalculatorForm';
 import { importElitProductAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -30,12 +30,15 @@ export default async function ElitImportPage({ searchParams }: {
     {missingPricing && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
       Elit no informó {product.pricing.supplierPriceUsd ? 'el tipo de cambio' : product.pricing.exchangeRateArsPerUsd ? 'el precio en USD' : 'el precio en USD ni el tipo de cambio'}. Completá el campo marcado en cero para calcular y guardar el producto.
     </p>}
-    <PricingCalculatorForm action={save} initial={{
+    <SupplierPricingCalculatorForm action={save} supplierLabel="Elit" initial={{
       supplierPriceUsd: product.pricing.supplierPriceUsd ?? 0,
+      supplierPriceArs: 0,
       supplierCurrency: 'USD',
       exchangeRateArsPerUsd: product.pricing.exchangeRateArsPerUsd ?? 0,
+      vatTreatment: 'EXCLUDED',
       vatPercentage: product.pricing.vatPercentage,
       internalTaxAmountUsd: 0,
+      internalTaxAmountArs: 0,
       supplierPvpUsd: 0,
       supplierPvpArs: 0,
       supplierMarkupPercentage: 0,

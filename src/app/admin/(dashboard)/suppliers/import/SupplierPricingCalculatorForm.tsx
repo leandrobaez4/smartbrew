@@ -3,12 +3,15 @@
 import { useMemo, useState } from 'react';
 import { calculateSupplierProductPricing } from '@/lib/supplier-product-pricing';
 
-type PricingValues = {
+export type PricingValues = {
   supplierPriceUsd: number;
-  supplierCurrency: 'USD';
+  supplierPriceArs: number;
+  supplierCurrency: 'USD' | 'ARS';
   exchangeRateArsPerUsd: number;
+  vatTreatment: 'INCLUDED' | 'EXCLUDED' | 'UNKNOWN';
   vatPercentage: number;
   internalTaxAmountUsd: number;
+  internalTaxAmountArs: number;
   supplierPvpUsd: number;
   supplierPvpArs: number;
   supplierMarkupPercentage: number;
@@ -26,13 +29,19 @@ const inputClass = 'mt-1 block w-full rounded-md border border-gray-300 bg-white
 const ars = (value: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 const usd = (value: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD' }).format(value);
 
-export default function PricingCalculatorForm({
+export default function SupplierPricingCalculatorForm({
   action,
   initial,
+  supplierLabel,
+  shippingReferenceArs,
+  packageDefaults,
   submitLabel = 'Guardar producto y cálculo',
 }: {
   action: (formData: FormData) => void | Promise<void>;
   initial: PricingValues;
+  supplierLabel: string;
+  shippingReferenceArs?: number | null;
+  packageDefaults?: { weightGrams?: number | null; heightCm?: number | null; widthCm?: number | null; lengthCm?: number | null };
   submitLabel?: string;
 }) {
   const [values, setValues] = useState(initial);
@@ -44,21 +53,37 @@ export default function PricingCalculatorForm({
 
   return <form action={action} className="space-y-6">
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-      <h2 className="text-lg font-bold">Costo de Elit</h2>
+      <h2 className="text-lg font-bold">Costo de {supplierLabel}</h2>
       <p className="mt-1 text-sm text-gray-500">Estos valores llegan desde la extensión y se pueden corregir antes de guardar.</p>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <input type="hidden" name="supplierCurrency" value={values.supplierCurrency} />
-        <NumberField name="supplierPriceUsd" label="Precio sin IVA (USD)" value={values.supplierPriceUsd} onChange={updateNumber} />
-        <NumberField name="exchangeRateArsPerUsd" label="Tipo de cambio (ARS por USD)" value={values.exchangeRateArsPerUsd} onChange={updateNumber} />
+        {values.supplierCurrency === 'USD' ? <>
+          <NumberField name="supplierPriceUsd" label="Precio base (USD)" value={values.supplierPriceUsd} onChange={updateNumber} />
+          <NumberField name="exchangeRateArsPerUsd" label="Tipo de cambio (ARS por USD)" value={values.exchangeRateArsPerUsd} onChange={updateNumber} />
+          <input type="hidden" name="supplierPriceArs" value="0" />
+        </> : <>
+          <NumberField name="supplierPriceArs" label="Costo base (ARS)" value={values.supplierPriceArs} onChange={updateNumber} />
+          <input type="hidden" name="supplierPriceUsd" value="0" />
+          <input type="hidden" name="exchangeRateArsPerUsd" value="0" />
+        </>}
+        <label className="text-sm font-medium">Tratamiento del IVA
+          <select name="vatTreatment" value={values.vatTreatment} onChange={(event) => setValues((current) => ({ ...current, vatTreatment: event.target.value as PricingValues['vatTreatment'] }))} className={inputClass}>
+            <option value="INCLUDED">Incluido en el costo</option>
+            <option value="EXCLUDED">No incluido / sumar IVA</option>
+            <option value="UNKNOWN">Desconocido / no estimar</option>
+          </select>
+        </label>
         <NumberField name="vatPercentage" label="IVA (%)" value={values.vatPercentage} onChange={updateNumber} />
-        <NumberField name="internalTaxAmountUsd" label="Impuesto interno (USD)" value={values.internalTaxAmountUsd} onChange={updateNumber} />
+        {values.supplierCurrency === 'USD'
+          ? <><NumberField name="internalTaxAmountUsd" label="Impuesto interno (USD)" value={values.internalTaxAmountUsd} onChange={updateNumber} /><input type="hidden" name="internalTaxAmountArs" value="0" /></>
+          : <><NumberField name="internalTaxAmountArs" label="Impuesto interno (ARS)" value={values.internalTaxAmountArs} onChange={updateNumber} /><input type="hidden" name="internalTaxAmountUsd" value="0" /></>}
       </div>
       {calculation && <dl className="mt-5 grid gap-3 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-950 md:grid-cols-2 lg:grid-cols-4">
         <Metric label="Precio en pesos" value={ars(calculation.supplierPriceArs)} />
         <Metric label="IVA aplicado USD" value={usd(calculation.vatAmountUsd)} />
         <Metric label="IVA aplicado ARS" value={ars(calculation.vatAmountArs)} />
         <Metric label="Impuesto interno aplicado" value={`${usd(calculation.internalTaxAmountUsd)} · ${ars(calculation.internalTaxAmountArs)}`} />
-        <Metric label="Costo Elit con impuestos" value={`${usd(calculation.supplierCostWithTaxesUsd)} · ${ars(calculation.supplierCostWithTaxesArs)}`} />
+        <Metric label={`Costo ${supplierLabel} con impuestos`} value={values.supplierCurrency === 'USD' ? `${usd(calculation.supplierCostWithTaxesUsd)} · ${ars(calculation.supplierCostWithTaxesArs)}` : ars(calculation.supplierCostWithTaxesArs)} />
       </dl>}
     </section>
 
@@ -66,9 +91,9 @@ export default function PricingCalculatorForm({
       <h2 className="text-lg font-bold">Referencia comercial del proveedor</h2>
       <p className="mt-1 text-sm text-gray-500">El PVP y el markup sirven para comparar. No reemplazan el precio que SmartBrew calcula desde el costo real.</p>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <NumberField name="supplierPvpUsd" label="PVP Elit (USD, opcional)" value={values.supplierPvpUsd} onChange={updateNumber} required={false} />
-        <NumberField name="supplierPvpArs" label="PVP Elit (ARS, opcional)" value={values.supplierPvpArs} onChange={updateNumber} required={false} />
-        <NumberField name="supplierMarkupPercentage" label="Markup Elit (%, opcional)" value={values.supplierMarkupPercentage} onChange={updateNumber} required={false} />
+        <NumberField name="supplierPvpUsd" label={`PVP ${supplierLabel} (USD, opcional)`} value={values.supplierPvpUsd} onChange={updateNumber} required={false} />
+        <NumberField name="supplierPvpArs" label={`PVP ${supplierLabel} (ARS, opcional)`} value={values.supplierPvpArs} onChange={updateNumber} required={false} />
+        <NumberField name="supplierMarkupPercentage" label={`Markup ${supplierLabel} (%, opcional)`} value={values.supplierMarkupPercentage} onChange={updateNumber} required={false} />
       </div>
       {calculation && (calculation.supplierPvpUsd || calculation.supplierPvpArs) && <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
         Referencia: {calculation.supplierPvpUsd ? usd(calculation.supplierPvpUsd) : '—'} · {calculation.supplierPvpArs ? ars(calculation.supplierPvpArs) : '—'}
@@ -93,6 +118,8 @@ export default function PricingCalculatorForm({
         </label>
       </div>
       <p className="mt-3 text-xs text-gray-500">Todas las publicaciones se despachan por Mercado Envíos (ME2), sin retiro en persona y con el envío a cargo del comprador. Mercado Libre calcula el importe; usá el costo anterior solo si la categoría o el precio obligan a subsidiarlo.</p>
+      {shippingReferenceArs != null && <p className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Referencia de envío Tiendanube: {ars(shippingReferenceArs)}. Es informativa y no se suma automáticamente al costo de Mercado Libre.</p>}
+      {packageDefaults && <p className="mt-3 text-xs text-gray-500">Paquete precargado: {packageDefaults.weightGrams ?? '—'} g · {packageDefaults.heightCm ?? '—'} × {packageDefaults.widthCm ?? '—'} × {packageDefaults.lengthCm ?? '—'} cm.</p>}
     </section>
 
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">

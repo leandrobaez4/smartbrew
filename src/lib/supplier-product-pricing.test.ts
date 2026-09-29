@@ -5,9 +5,12 @@ describe('supplier product pricing', () => {
   const input = {
     supplierPriceUsd: 100,
     supplierCurrency: 'USD' as const,
+    supplierPriceArs: 0,
     exchangeRateArsPerUsd: 1_535,
+    vatTreatment: 'EXCLUDED' as const,
     vatPercentage: 21,
     internalTaxAmountUsd: 5,
+    internalTaxAmountArs: 0,
     supplierPvpUsd: 140,
     supplierPvpArs: 214_900,
     supplierMarkupPercentage: 15,
@@ -67,5 +70,49 @@ describe('supplier product pricing', () => {
     expect(lowReference.finalPriceArs).toBe(highReference.finalPriceArs);
     expect(lowReference.supplierPvpArs).toBe(168_850);
     expect(highReference.supplierPvpArs).toBe(383_750);
+  });
+
+  it('calculates ARS costs without requiring a USD exchange rate', () => {
+    const result = calculateSupplierProductPricing({
+      ...input,
+      supplierCurrency: 'ARS',
+      supplierPriceUsd: 0,
+      supplierPriceArs: 14_169,
+      exchangeRateArsPerUsd: 0,
+      vatTreatment: 'INCLUDED',
+      internalTaxAmountUsd: 0,
+      internalTaxAmountArs: 1_000,
+      supplierPvpUsd: 0,
+      supplierPvpArs: 18_000,
+    });
+
+    expect(result).toMatchObject({
+      supplierCurrency: 'ARS',
+      supplierPriceUsd: 0,
+      supplierPriceArs: 14_169,
+      vatAmountUsd: 0,
+      vatAmountArs: 2_459.08,
+      supplierCostWithVatArs: 14_169,
+      internalTaxAmountArs: 1_000,
+      supplierCostWithTaxesArs: 15_169,
+      supplierPvpArs: 18_000,
+    });
+  });
+
+  it('keeps unknown VAT out of the cost instead of inventing a tax amount', () => {
+    const result = calculateSupplierProductPricing({
+      ...input,
+      supplierCurrency: 'ARS',
+      supplierPriceUsd: 0,
+      supplierPriceArs: 14_169,
+      exchangeRateArsPerUsd: 0,
+      vatTreatment: 'UNKNOWN',
+      internalTaxAmountUsd: 0,
+      internalTaxAmountArs: 0,
+    });
+
+    expect(result.vatAmountArs).toBe(0);
+    expect(result.vatPercentage).toBe(0);
+    expect(result.supplierCostWithVatArs).toBe(14_169);
   });
 });

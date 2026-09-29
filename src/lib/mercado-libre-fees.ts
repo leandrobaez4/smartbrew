@@ -1,6 +1,6 @@
 import { portalDb } from './portal';
 import { getMercadoLibreAccessToken } from './mercado-libre-oauth';
-import { calculateSupplierProductPricing } from './supplier-product-pricing';
+import { calculateSupplierProductPricing, inferVatTreatment } from './supplier-product-pricing';
 
 export type MercadoLibreFeeQuote = {
   percentage: number;
@@ -78,10 +78,18 @@ export async function syncMarketplaceFees(client: Pick<MercadoLibreFeeClient, 'q
       });
       const pricing = calculateSupplierProductPricing({
         supplierPriceUsd: Number(record.supplierPriceUsd),
-        supplierCurrency: 'USD',
+        supplierPriceArs: Number(record.supplierPriceArs),
+        supplierCurrency: record.supplierCurrency === 'ARS' ? 'ARS' : 'USD',
         exchangeRateArsPerUsd: Number(record.exchangeRateArsPerUsd),
+        vatTreatment: inferVatTreatment({
+          supplierCurrency: record.supplierCurrency,
+          supplierPriceArs: Number(record.supplierPriceArs),
+          supplierCostWithVatArs: Number(record.supplierCostWithVatArs),
+          vatPercentage: Number(record.vatPercentage),
+        }),
         vatPercentage: Number(record.vatPercentage),
         internalTaxAmountUsd: Number(record.internalTaxAmountUsd),
+        internalTaxAmountArs: Number(record.internalTaxAmountArs),
         supplierPvpUsd: Number(record.supplierPvpUsd || 0),
         supplierPvpArs: Number(record.supplierPvpArs || 0),
         supplierMarkupPercentage: Number(record.supplierMarkupPercentage || 0),

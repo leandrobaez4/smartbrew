@@ -5,11 +5,14 @@ const finiteMoney = z.coerce.number().finite().nonnegative().max(1_000_000_000);
 const percentage = z.coerce.number().finite().nonnegative().lt(100);
 
 export const SupplierProductPricingSchema = z.object({
-  supplierPriceUsd: finiteMoney.positive(),
-  supplierCurrency: z.literal('USD').default('USD'),
-  exchangeRateArsPerUsd: finiteMoney.positive(),
+  supplierPriceUsd: finiteMoney.default(0),
+  supplierPriceArs: finiteMoney.default(0),
+  supplierCurrency: z.enum(['USD', 'ARS']).default('USD'),
+  exchangeRateArsPerUsd: finiteMoney.default(0),
+  vatTreatment: z.enum(['INCLUDED', 'EXCLUDED', 'UNKNOWN']).default('EXCLUDED'),
   vatPercentage: percentage,
   internalTaxAmountUsd: finiteMoney.default(0),
+  internalTaxAmountArs: finiteMoney.default(0),
   supplierPvpUsd: finiteMoney.default(0),
   supplierPvpArs: finiteMoney.default(0),
   supplierMarkupPercentage: percentage.default(0),
@@ -20,10 +23,20 @@ export const SupplierProductPricingSchema = z.object({
   marketplaceCategoryId: z.string().trim().regex(/^MLA\d+$/, 'Ingresá una categoría de Mercado Libre válida.').or(z.literal('')),
   marketplaceListingTypeId: z.enum(['gold_special', 'gold_pro']),
   targetMarginPercentage: z.coerce.number().finite().nonnegative().max(80),
-}).refine(
-  (value) => value.targetMarginPercentage + value.marketplaceFeePercentage < 100,
-  { message: 'El margen y la comisión deben sumar menos de 100%.', path: ['targetMarginPercentage'] },
-);
+}).superRefine((value, context) => {
+  if (value.supplierCurrency === 'USD' && value.supplierPriceUsd <= 0) {
+    context.addIssue({ code: 'custom', message: 'El costo en USD debe ser mayor que cero.', path: ['supplierPriceUsd'] });
+  }
+  if (value.supplierCurrency === 'USD' && value.exchangeRateArsPerUsd <= 0) {
+    context.addIssue({ code: 'custom', message: 'La cotización debe ser mayor que cero.', path: ['exchangeRateArsPerUsd'] });
+  }
+  if (value.supplierCurrency === 'ARS' && value.supplierPriceArs <= 0) {
+    context.addIssue({ code: 'custom', message: 'El costo en ARS debe ser mayor que cero.', path: ['supplierPriceArs'] });
+  }
+  if (value.targetMarginPercentage + value.marketplaceFeePercentage >= 100) {
+    context.addIssue({ code: 'custom', message: 'El margen y la comisión deben sumar menos de 100%.', path: ['targetMarginPercentage'] });
+  }
+});
 
 export type SupplierProductPricingInput = z.infer<typeof SupplierProductPricingSchema>;
 
@@ -31,12 +44,28 @@ const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 10
 
 export function calculateSupplierProductPricing(input: SupplierProductPricingInput) {
   const parsed = SupplierProductPricingSchema.parse(input);
-  const supplierPriceArs = parsed.supplierPriceUsd * parsed.exchangeRateArsPerUsd;
-  const vatAmountUsd = parsed.supplierPriceUsd * parsed.vatPercentage / 100;
-  const vatAmountArs = supplierPriceArs * parsed.vatPercentage / 100;
-  const supplierCostWithVatUsd = parsed.supplierPriceUsd + vatAmountUsd;
-  const supplierCostWithVatArs = supplierPriceArs + vatAmountArs;
-  const internalTaxAmountArs = parsed.internalTaxAmountUsd * parsed.exchangeRateArsPerUsd;
+  const supplierPriceUsd = parsed.supplierCurrency === 'USD' ? parsed.supplierPriceUsd : 0;
+  const supplierPriceArs = parsed.supplierCurrency === 'USD'
+    ? supplierPriceUsd * parsed.exchangeRateArsPerUsd
+    : parsed.supplierPriceArs;
+  const vatRate = parsed.vatPercentage / 100;
+  const vatAmountArs = parsed.vatTreatment === 'UNKNOWN'
+    ? 0
+    : parsed.vatTreatment === 'INCLUDED'
+      ? supplierPriceArs - supplierPriceArs / (1 + vatRate)
+      : supplierPriceArs * vatRate;
+  const vatAmountUsd = parsed.supplierCurrency === 'USD'
+    ? (parsed.vatTreatment === 'UNKNOWN'
+      ? 0
+      : parsed.vatTreatment === 'INCLUDED'
+        ? supplierPriceUsd - supplierPriceUsd / (1 + vatRate)
+        : supplierPriceUsd * vatRate)
+    : 0;
+  const supplierCostWithVatUsd = parsed.vatTreatment === 'EXCLUDED' ? supplierPriceUsd + vatAmountUsd : supplierPriceUsd;
+  const supplierCostWithVatArs = parsed.vatTreatment === 'EXCLUDED' ? supplierPriceArs + vatAmountArs : supplierPriceArs;
+  const internalTaxAmountArs = parsed.supplierCurrency === 'USD'
+    ? parsed.internalTaxAmountUsd * parsed.exchangeRateArsPerUsd
+    : parsed.internalTaxAmountArs;
   const supplierCostWithTaxesUsd = supplierCostWithVatUsd + parsed.internalTaxAmountUsd;
   const supplierCostWithTaxesArs = supplierCostWithVatArs + internalTaxAmountArs;
   const result = new PricingService({ minimumMarginPercentage: parsed.targetMarginPercentage }).calculate({
@@ -54,11 +83,11 @@ export function calculateSupplierProductPricing(input: SupplierProductPricingInp
   const totalCostArs = finalPriceArs - targetProfitArs;
 
   return {
-    supplierPriceUsd: round(parsed.supplierPriceUsd),
+    supplierPriceUsd: round(supplierPriceUsd),
     supplierCurrency: parsed.supplierCurrency,
     exchangeRateArsPerUsd: round(parsed.exchangeRateArsPerUsd),
     supplierPriceArs: round(supplierPriceArs),
-    vatPercentage: round(parsed.vatPercentage),
+    vatPercentage: parsed.vatTreatment === 'UNKNOWN' ? 0 : round(parsed.vatPercentage),
     vatAmountUsd: round(vatAmountUsd),
     vatAmountArs: round(vatAmountArs),
     supplierCostWithVatUsd: round(supplierCostWithVatUsd),
@@ -84,4 +113,17 @@ export function calculateSupplierProductPricing(input: SupplierProductPricingInp
     totalCostArs: round(totalCostArs),
     finalPriceArs,
   };
+}
+
+export function inferVatTreatment(input: {
+  supplierCurrency: string;
+  supplierPriceArs: number;
+  supplierCostWithVatArs: number;
+  vatPercentage: number;
+}) {
+  if (input.vatPercentage <= 0) return 'UNKNOWN' as const;
+  if (input.supplierCurrency === 'ARS' && Math.abs(input.supplierPriceArs - input.supplierCostWithVatArs) < 0.01) {
+    return 'INCLUDED' as const;
+  }
+  return 'EXCLUDED' as const;
 }
