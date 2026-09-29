@@ -51,3 +51,27 @@ export const UnidropSnapshotSchema = z.object({
 });
 
 export type UnidropSnapshot = z.infer<typeof UnidropSnapshotSchema>;
+
+export const UnidropImportCommandSchema = z.object({
+  version: z.literal(1),
+  command: z.literal('IMPORT_SUPPLIER_PRODUCT'),
+  supplierSlug: z.literal('unidrop'),
+  externalId: z.string().regex(/^\d{1,20}:[A-Za-z0-9][A-Za-z0-9._/-]{0,159}$/),
+  snapshot: UnidropSnapshotSchema,
+}).strict().refine((value) => value.externalId === value.snapshot.externalId, {
+  message: 'El producto no coincide con el comando de importación.',
+  path: ['externalId'],
+});
+
+export function decodeUnidropImportPayload(payload: string) {
+  if (!payload || payload.length > 60_000 || !/^[A-Za-z0-9_-]+$/.test(payload)) return null;
+  try {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = Buffer.from(normalized, 'base64').toString('utf8');
+    const decoded: unknown = JSON.parse(json);
+    const command = UnidropImportCommandSchema.safeParse(decoded);
+    return command.success ? command.data.snapshot : null;
+  } catch {
+    return null;
+  }
+}

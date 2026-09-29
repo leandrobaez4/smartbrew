@@ -70,6 +70,37 @@ describe('supplier catalog import mapping', () => {
     });
   });
 
+  it('deduplicates repeated Unidrop snapshots by productId:SKU in one import', async () => {
+    db.transaction.mockClear();
+    db.upsert.mockClear();
+    db.findMany.mockResolvedValue([]);
+    const first = {
+      externalId: '398:MINASPGATITO',
+      sku: 'MINASPGATITO',
+      title: 'Mini aspiradora',
+      cost: 14_169,
+      stock: 40,
+      rawData: { sourceProductId: '398', capturedAt: '2026-09-29T17:00:00-03:00' },
+    };
+
+    const result = await importSupplierProducts('unidrop-supplier', [
+      first,
+      { ...first, cost: 15_000, stock: 38, rawData: { ...first.rawData, capturedAt: '2026-09-29T18:00:00-03:00' } },
+    ], syncedAt);
+
+    expect(result.imported).toBe(1);
+    expect(db.upsert).toHaveBeenCalledTimes(1);
+    expect(db.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        supplierId_externalId: {
+          supplierId: 'unidrop-supplier',
+          externalId: '398:MINASPGATITO',
+        },
+      },
+      update: expect.objectContaining({ cost: expect.anything(), stock: 38 }),
+    }));
+  });
+
   it('records price and stock snapshots only when either value changes', async () => {
     db.transaction.mockClear();
     db.upsert.mockClear();
