@@ -247,6 +247,11 @@ model Order {
   shippingData         Json
   supplierOrderId      String?
   supplierResponse     Json?
+  actualSupplierCost   Decimal?
+  manualPurchaseReference String?
+  manualPurchaseError  String?
+  manualPurchaseCompletedAt DateTime?
+  manualPurchaseUpdatedAt DateTime?
   status               OrderStatus        @default(PENDING)
   paymentStatus        String?
   shippingStatus       String?

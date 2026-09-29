@@ -2,6 +2,9 @@ import { OrderStatus } from '@prisma/client';
 import { orderFinancials } from '@/lib/orders';
 import { portalDb, requireAdmin } from '@/lib/portal';
 import PurchaseSupplierButton from './PurchaseSupplierButton';
+import ManualSupplierPurchaseForm from './ManualSupplierPurchaseForm';
+import { getDropshippingSettings } from '@/lib/dropshipping-settings';
+import { supplierSnapshotFreshness, supplierSourceUrl } from '@/lib/supplier-snapshot-freshness';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +17,7 @@ function money(value: number, currency = 'ARS') {
 }
 
 const labels: Record<OrderStatus, string> = {
-  PENDING: 'Awaiting Supplier Purchase',
+  PENDING: 'Compra pendiente',
   SUPPLIER_PENDING: 'Supplier Pending',
   SUPPLIER_PAID: 'Supplier Paid',
   PROCESSING: 'Processing',
@@ -26,10 +29,10 @@ const labels: Record<OrderStatus, string> = {
 
 export default async function OrdersPage() {
   await requireAdmin();
-  const orders = await portalDb.order.findMany({
+  const [orders, settings] = await Promise.all([portalDb.order.findMany({
     include: { supplier: true, supplierProduct: true },
     orderBy: { createdAt: 'desc' },
-  });
+  }), getDropshippingSettings()]);
 
   return <div className="mx-auto max-w-[1500px]">
     <div className="mb-6">
@@ -46,18 +49,25 @@ export default async function OrdersPage() {
             const supplierCost = Number(order.supplierCost);
             const profit = Number(order.profit);
             const financials = orderFinancials({ salePrice, supplierCost, quantity: order.quantity, profit });
-            const actionable = (order.status === OrderStatus.PENDING || order.status === OrderStatus.ERROR) && !order.supplierOrderId;
+            const unidrop = order.supplier.type === 'unidrop-snapshot-v1';
+            const actionable = !unidrop && (order.status === OrderStatus.PENDING || order.status === OrderStatus.ERROR) && !order.supplierOrderId;
+            const manualActionable = unidrop && (order.status === OrderStatus.PENDING || order.status === OrderStatus.ERROR) && !order.manualPurchaseCompletedAt;
+            const freshness = unidrop ? supplierSnapshotFreshness({ verifiedAt: order.supplierProduct.lastSyncAt, freshHours: settings.snapshotFreshHours, expiredHours: settings.snapshotExpiredHours }) : null;
+            const sourceUrl = unidrop ? supplierSourceUrl(order.supplierProduct.rawData) : null;
+            const estimatedProfit = salePrice - financials.supplierTotal - Number(order.marketplaceFee) - Number(order.shippingCost) - Number(order.taxes);
+            const actualCost = order.actualSupplierCost == null ? null : Number(order.actualSupplierCost);
+            const actualProfit = actualCost == null ? null : salePrice - actualCost - Number(order.marketplaceFee) - Number(order.shippingCost) - Number(order.taxes);
             return <tr key={order.id}>
               <td className="px-4 py-3"><p className="font-semibold">{order.marketplaceOrderId}</p><p className="text-xs text-gray-500">{order.quantity} unidad(es)</p></td>
-              <td className="px-4 py-3 text-sm">{order.supplierProduct.title}</td>
+              <td className="px-4 py-3 text-sm"><p>{order.supplierProduct.title}</p><p className="text-xs text-gray-500">SKU {order.supplierProduct.sku || '—'}</p>{sourceUrl && <a href={sourceUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">Abrir producto en Unidrop</a>}</td>
               <td className="px-4 py-3 text-sm">{order.supplier.name}</td>
               <td className="px-4 py-3 font-semibold">{money(salePrice, order.currency || 'ARS')}</td>
-              <td className="px-4 py-3 text-sm">{money(financials.supplierTotal, order.supplierProduct.currency || order.currency || 'ARS')}</td>
-              <td className={`px-4 py-3 text-sm font-semibold ${profit >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{money(profit, order.currency || 'ARS')}</td>
+              <td className="px-4 py-3 text-sm"><p>Estimado {money(financials.supplierTotal, order.supplierProduct.currency || order.currency || 'ARS')}</p>{actualCost != null && <p className="font-semibold">Real {money(actualCost, order.currency || 'ARS')}</p>}</td>
+              <td className={`px-4 py-3 text-sm font-semibold ${(actualProfit ?? estimatedProfit) >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}><p>Estimado {money(estimatedProfit, order.currency || 'ARS')}</p>{actualProfit != null && <p>Real {money(actualProfit, order.currency || 'ARS')}</p>}</td>
               <td className="px-4 py-3 text-sm">{financials.marginPercentage.toFixed(2)}%</td>
               <td className="px-4 py-3 text-sm">{order.supplierProduct.stock ?? '—'}</td>
-              <td className="px-4 py-3 text-xs font-semibold">{labels[order.status]}</td>
-              <td className="px-4 py-3">{actionable ? <PurchaseSupplierButton orderId={order.id} /> : <span className="text-xs text-gray-500">{order.supplierOrderId || 'Sin acción pendiente'}</span>}</td>
+              <td className="px-4 py-3 text-xs font-semibold"><p>{unidrop && order.status === OrderStatus.PENDING ? 'Compra manual pendiente' : labels[order.status]}</p>{freshness && <p className={freshness.status === 'EXPIRED' ? 'mt-1 text-red-700 dark:text-red-400' : 'mt-1 text-gray-500'}>Snapshot {freshness.status === 'EXPIRED' ? 'vencido' : freshness.status === 'EXPIRING' ? 'por vencer' : freshness.status === 'REVIEW_REQUIRED' ? 'requiere revisión' : 'reciente'}</p>}{order.manualPurchaseError && <p className="mt-1 text-red-700 dark:text-red-400">{order.manualPurchaseError}</p>}</td>
+              <td className="px-4 py-3">{manualActionable ? <ManualSupplierPurchaseForm orderId={order.id} estimatedCost={financials.supplierTotal} /> : actionable ? <PurchaseSupplierButton orderId={order.id} /> : <span className="text-xs text-gray-500">{order.manualPurchaseReference || order.supplierOrderId || 'Sin acción pendiente'}</span>}</td>
             </tr>;
           })}
           {!orders.length && <tr><td colSpan={10} className="px-4 py-10 text-center text-sm text-gray-500">Todavía no hay órdenes de Mercado Libre.</td></tr>}
