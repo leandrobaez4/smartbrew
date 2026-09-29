@@ -24,12 +24,13 @@ El botón del listado usa una acción autenticada de encolado, un JobExecution p
 
 El worker `/api/queue/product-publish` exige claves y firma válidas. Usa el servicio de publicación con bloqueo del producto y los controles previos de duplicados. Se preservan IDs e historial. El detalle y la vista previa individual también usan la misma acción de encolado del listado, sin esperar a Meta ni informar una publicación confirmada al encolar.
 
-- Producto con trabajo STARTED: no se crea otro trabajo ni se vuelve a enviar a QStash. La respuesta distingue los nuevos encolados de los que ya estaban en cola/procesando. La comprobación se realiza con bloqueo del producto, incluso ante dos clics simultáneos.
-- Envío a QStash incierto: se conserva la reserva y se informa el error. No se reenvía desde el botón normal: requiere verificar QStash y recuperar administrativamente el trabajo para no duplicar una entrega que sí pudo haberse aceptado.
+- Producto con trabajo STARTED ya reclamado por el consumidor: no se crea otro trabajo ni se vuelve a enviar a QStash. La comprobación se realiza con bloqueo del producto, incluso ante dos clics simultáneos.
+- Trabajo STARTED todavía no reclamado: el botón puede reenviar el mismo ID a QStash. La clave de deduplicación y el claim transaccional del consumidor impiden que dos entregas creen dos intentos de publicación.
+- Envío a QStash incierto: se conserva la reserva y se informa el error. Un nuevo intento reutiliza el mismo trabajo en lugar de crear otra publicación.
 - Reentrega de trabajo completado o fallido: no repite la publicación.
 - Trabajo reclamado e interrumpido: no lo vuelve a ejecutar ciegamente; se señala revisión después de tres minutos. Verificar logs y estado real antes de conciliar. No hay recuperación automática de efectos externos ambiguos.
 - Error confirmado por Meta o resultado incierto: queda registrado en Publication y JobExecution. Un HTTP 200 del consumidor significa trabajo atendido, no publicación exitosa.
 - Ver el resultado en la columna Instagram y usar «Actualizar estado de la cola». Los errores completos están en el tooltip y registros del admin.
-- No hay un cron ni botón de recuperación para mensajes nunca aceptados por QStash; deben revisarse antes de recuperarlos administrativamente.
+- No hay un cron de recuperación para mensajes nunca aceptados por QStash; el usuario puede volver a encolar explícitamente el mismo trabajo desde el botón de publicación.
 
 Pruebas locales con mocks: `npm test` y `node --test extensions/affiliate-link/request.test.mjs extensions/affiliate-link/gallery.test.mjs`. La prueba de producción y la instalación de extensión requieren intervención del usuario; no se ha publicado nada remotamente desde estas pruebas.

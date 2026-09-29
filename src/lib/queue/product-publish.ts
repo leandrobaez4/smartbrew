@@ -18,10 +18,13 @@ export async function enqueueProductPublish(productId: string) {
     const created = await tx.jobExecution.create({ data: { jobName: 'instagram_product_publish', entityId: productId, entityType: 'product', status: 'STARTED' } });
     return { job: created, alreadyQueued: false };
   });
-  if (job.alreadyQueued) {
-    if (job.job.outputJson && Date.now() - job.job.startedAt.getTime() > 180000) throw Error('Intento interrumpido: verificá y conciliá su resultado antes de volver a publicar.');
+  if (job.alreadyQueued && job.job.outputJson) {
+    if (Date.now() - job.job.startedAt.getTime() > 180000) throw Error('Intento interrumpido: verificá y conciliá su resultado antes de volver a publicar.');
     return { jobId: job.job.id, alreadyQueued: true };
   }
+  // A STARTED job without outputJson has not been claimed by the consumer. Reuse
+  // its ID so QStash deduplication and the transactional consumer claim make an
+  // explicit retry safe without creating another Instagram publication attempt.
   try {
     await new Client({ token: process.env.QSTASH_TOKEN }).publishJSON({
       url: url.href, body: { jobId: job.job.id }, deduplicationId: job.job.id, retries: 3,
@@ -29,8 +32,8 @@ export async function enqueueProductPublish(productId: string) {
       timeout: '90s',
       headers: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : undefined,
     });
-  } catch { throw Error('No se confirmó el envío a QStash. El trabajo quedó reservado para evitar duplicados; revisá QStash antes de recuperarlo.'); }
-  return { jobId: job.job.id, alreadyQueued: false };
+  } catch { throw Error('No se confirmó el envío a QStash. Podés volver a intentar: se reutilizará el mismo trabajo sin crear otra publicación.'); }
+  return { jobId: job.job.id, alreadyQueued: job.alreadyQueued };
 }
 
 export async function processProductPublish(jobId: string) {

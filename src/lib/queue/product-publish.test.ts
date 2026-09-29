@@ -18,18 +18,18 @@ it('enqueues one durable job and limits consumer concurrency, without calling Me
   expect(m.publish).toHaveBeenCalledWith(expect.objectContaining({ body: { jobId: 'job' }, flowControl: { key: 'smartbrew-product-publish', parallelism: 1 }, deduplicationId: 'job' }));
   expect(m.meta).not.toHaveBeenCalled();
 });
-it('does not resend pending jobs even before the worker claims them', async () => {
+it('resends an unclaimed pending job with the same idempotency key', async () => {
   m.find.mockResolvedValue({ id: 'existing', outputJson: null });
   expect(await enqueueProductPublish('product')).toEqual({ jobId: 'existing', alreadyQueued: true });
   expect(m.create).not.toHaveBeenCalled();
-  expect(m.publish).not.toHaveBeenCalled();
+  expect(m.publish).toHaveBeenCalledWith(expect.objectContaining({ body: { jobId: 'existing' }, deduplicationId: 'existing' }));
 });
 it('does not resend a processing job', async () => {
   m.find.mockResolvedValue({ id: 'existing', outputJson: { phase: 'CLAIMED' }, startedAt: new Date() });
   expect(await enqueueProductPublish('product')).toMatchObject({ alreadyQueued: true });
   expect(m.publish).not.toHaveBeenCalled();
 });
-it('serializes two enqueue requests and dispatches only once', async () => {
+it('serializes two enqueue requests and reuses one idempotent job', async () => {
   const run = m.transaction.getMockImplementation()!;
   let tail = Promise.resolve();
   let pending: { id: string; outputJson: null } | null = null;
@@ -43,7 +43,8 @@ it('serializes two enqueue requests and dispatches only once', async () => {
   const results = await Promise.all([enqueueProductPublish('product'), enqueueProductPublish('product')]);
   expect(results.filter(result => result.alreadyQueued)).toHaveLength(1);
   expect(m.create).toHaveBeenCalledTimes(1);
-  expect(m.publish).toHaveBeenCalledTimes(1);
+  expect(m.publish).toHaveBeenCalledTimes(2);
+  expect(m.publish.mock.calls.map(call => call[0].deduplicationId)).toEqual(['job', 'job']);
 });
 it('fails closed without signing keys', async () => {
   vi.stubEnv('QSTASH_CURRENT_SIGNING_KEY', '');
@@ -53,6 +54,15 @@ it('fails closed without signing keys', async () => {
 it('does not hide queue submission failures', async () => {
   m.publish.mockRejectedValue(Error('network'));
   await expect(enqueueProductPublish('product')).rejects.toThrow('No se confirmó');
+});
+it('can retry a failed queue submission without creating a second job', async () => {
+  m.find.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'job', outputJson: null });
+  m.publish.mockRejectedValueOnce(Error('network')).mockResolvedValueOnce({ messageId: 'message' });
+  await expect(enqueueProductPublish('product')).rejects.toThrow('No se confirmó');
+  await expect(enqueueProductPublish('product')).resolves.toEqual({ jobId: 'job', alreadyQueued: true });
+  expect(m.create).toHaveBeenCalledTimes(1);
+  expect(m.publish).toHaveBeenCalledTimes(2);
+  expect(m.publish.mock.calls.map(call => call[0].deduplicationId)).toEqual(['job', 'job']);
 });
 it('marks confirmed publish as completed', async () => {
   await processProductPublish('job');
