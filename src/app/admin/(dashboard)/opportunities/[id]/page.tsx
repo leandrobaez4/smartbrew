@@ -45,7 +45,7 @@ export default async function SupplierProductEditorialPage({
       <Link href="/admin/opportunities" className="text-sm font-semibold text-blue-600 dark:text-blue-400">← Oportunidades</Link>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-sm font-semibold text-yellow-600">{product.supplier.name}</p><h1 className="text-2xl font-bold">Revisión editorial</h1><p className="mt-1 text-sm text-gray-500">Estado: {product.editorialStatus}</p></div>
-        <form action={generate}><button className="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">{product.supplier.integrationType === 'API' ? `Actualizar desde ${product.supplier.name} y generar con IA` : `Generar con IA desde datos de ${product.supplier.name}`}</button></form>
+        <div className="flex flex-wrap gap-2">{product.supplier.slug === 'unidrop' && <Link href={`/admin/opportunities/${product.id}/manual-publication`} className="rounded bg-yellow-500 px-4 py-2 font-semibold text-gray-950 hover:bg-yellow-400">Preparar publicación manual</Link>}<form action={generate}><button className="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">{product.supplier.integrationType === 'API' ? `Actualizar desde ${product.supplier.name} y generar con IA` : `Generar con IA desde datos de ${product.supplier.name}`}</button></form></div>
       </div>
     </div>
 
