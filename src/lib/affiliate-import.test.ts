@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ find: vi.fn(), update: vi.fn(), job: vi.fn(), publish: vi.fn(), transaction: vi.fn(), upsert: vi.fn(), finish: vi.fn(), generate: vi.fn() }));
-vi.mock('./portal', () => ({ portalDb: { product: { findUnique: m.find, updateMany: m.update }, jobExecution: { upsert: m.job }, $transaction: m.transaction } }));
+const m = vi.hoisted(() => ({ find: vi.fn(), update: vi.fn(), job: vi.fn(), failJob: vi.fn(), publish: vi.fn(), transaction: vi.fn(), upsert: vi.fn(), finish: vi.fn(), generate: vi.fn() }));
+vi.mock('./portal', () => ({ portalDb: { product: { findUnique: m.find }, jobExecution: { create: m.job, update: m.failJob }, $transaction: m.transaction } }));
 vi.mock('@upstash/qstash', () => ({ Client: class { publishJSON = m.publish; } }));
 vi.mock('./product-editorial', () => ({ generateAndSaveProductEditorial: m.generate }));
 import { parseAffiliateImport } from './affiliate-import-input';
@@ -9,6 +9,7 @@ const data = { url: 'https://www.mercadolibre.com.ar/reloj/p/MLA123#tracking=1',
 beforeEach(() => {
   vi.resetAllMocks();
   m.generate.mockResolvedValue({});
+  m.failJob.mockResolvedValue({});
   m.transaction.mockImplementation(fn => fn({ $queryRaw: vi.fn(), product: { findUniqueOrThrow: m.find, updateMany: m.update } }));
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -26,6 +27,7 @@ it('publishes only a durable job ID to the fixed consumer endpoint', async () =>
 it('never reports queue success after a failed publish', async () => {
   queueConfig(); m.publish.mockRejectedValue(Error('secret transport error'));
   await expect(saveOrQueueAffiliate(data, null)).rejects.toThrow('No se pudo confirmar');
+  expect(m.failJob).toHaveBeenCalledWith(expect.objectContaining({ where: { id: expect.stringMatching(/^affiliate_[a-f0-9]{64}$/) }, data: expect.objectContaining({ status: 'FAILED' }) }));
 });
 it('requires signing keys before enqueueing new imports', async () => {
   queueConfig(); vi.stubEnv('QSTASH_CURRENT_SIGNING_KEY', '');
@@ -50,11 +52,14 @@ it('rejects unsafe affiliate links and images', () => {
   expect(() => parseAffiliateImport({ ...data, affiliateUrl: 'https://evil.test/a' })).toThrow();
   expect(() => parseAffiliateImport({ ...data, image: 'http://localhost/a' })).toThrow();
 });
-it('updates only the affiliate link with a compare-and-swap guard', async () => {
-  m.find.mockResolvedValue({ id: 'p', affiliateUrl: null }); m.update.mockResolvedValue({ count: 1 });
-  expect(await saveOrQueueAffiliate(data, null)).toMatchObject({ productId: 'p' });
-  expect(m.update.mock.calls[0][0].data).toEqual({ affiliateUrl: data.affiliateUrl, imageUrls: [] });
-  expect(m.publish).not.toHaveBeenCalled();
+it('queues existing products instead of bypassing QStash', async () => {
+  queueConfig(); m.find.mockResolvedValue({ id: 'p', affiliateUrl: null }); m.publish.mockResolvedValue({ messageId: 'msg' });
+  const result = await saveOrQueueAffiliate(data, null);
+  expect(result).toHaveProperty('jobId');
+  expect(m.job).toHaveBeenCalledWith({ data: expect.objectContaining({
+    id: result.jobId, entityId: 'MLA123', status: 'STARTED', inputJson: expect.objectContaining({ expectedLink: null }),
+  }) });
+  expect(m.publish).toHaveBeenCalledTimes(1);
 });
 it('rejects concurrent link changes without queuing or overwriting', async () => {
   m.find.mockResolvedValue({ id: 'p', affiliateUrl: 'https://meli.la/other' }); m.update.mockResolvedValue({ count: 0 });
@@ -62,10 +67,18 @@ it('rejects concurrent link changes without queuing or overwriting', async () =>
   expect(m.publish).not.toHaveBeenCalled();
 });
 it('can add gallery photos even for an already saved link', async () => {
+  queueConfig();
   m.find.mockResolvedValue({ id: 'p', affiliateUrl: data.affiliateUrl });
-  m.update.mockResolvedValue({ count: 1 });
+  m.publish.mockResolvedValue({ messageId: 'msg' });
   await saveOrQueueAffiliate(data, null);
-  expect(m.update.mock.calls[0][0].data.affiliateUrl).toBe(data.affiliateUrl);
+  expect(m.publish).toHaveBeenCalledTimes(1);
+});
+it('creates a fresh QStash execution for every confirmation', async () => {
+  queueConfig(); m.publish.mockResolvedValue({ messageId: 'msg' });
+  const first = await saveOrQueueAffiliate(data, null);
+  const second = await saveOrQueueAffiliate(data, null);
+  expect(first.jobId).not.toBe(second.jobId);
+  expect(m.publish).toHaveBeenCalledTimes(2);
 });
 function worker(status = 'STARTED', count = 1) {
   m.transaction.mockImplementation(fn => fn({ $queryRaw: vi.fn(), jobExecution: { findUnique: vi.fn().mockResolvedValue({ jobName: 'affiliate_import', status, inputJson: data }), update: m.finish }, product: { upsert: m.upsert, updateMany: m.update, findUniqueOrThrow: vi.fn().mockResolvedValue({ imageUrls: [] }) } }));

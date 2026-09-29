@@ -11,6 +11,7 @@ export async function confirmAffiliateImport(_: { message: string }, form: FormD
     if (expected && form.get('replace') !== 'on') throw Error('Confirmá el reemplazo del enlace existente.');
     const result = await saveOrQueueAffiliate({ url: form.get('url'), affiliateUrl: form.get('affiliateUrl'), title: form.get('title'), image: form.get('image'), images: form.get('images') }, expected || null);
     revalidatePath('/admin/products');
+    revalidatePath('/admin/products/affiliate');
     return { message: result.message };
   } catch (error) {
     return { message: error instanceof Error && !error.name.includes('Prisma') && error.name !== 'ZodError' ? error.message : 'No se pudo guardar. Revisá los datos e intentá nuevamente.' };
