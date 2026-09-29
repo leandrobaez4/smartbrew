@@ -1,4 +1,4 @@
-import { getDropshippingSettings } from '@/lib/dropshipping-settings';
+import { getDropshippingSettings, supplierSyncIntervalOptions } from '@/lib/dropshipping-settings';
 import { requireAdmin } from '@/lib/portal';
 import { updateDropshippingSettingsAction } from './actions';
 
@@ -11,7 +11,6 @@ const numberFields = [
   ['minimumProfit', 'Ganancia mínima', '0.01'],
   ['minimumStock', 'Stock mínimo', '1'],
   ['priceChangeLimit', 'Límite de cambio de precio (%)', '0.01'],
-  ['supplierSyncInterval', 'Intervalo de sincronización (minutos)', '1'],
 ] as const;
 
 const booleanFields = [
@@ -49,6 +48,20 @@ export default async function DropshippingSettingsPage({ searchParams }: Props) 
             </label>
           ))}
         </div>
+
+        <label className="text-sm font-medium text-gray-800 dark:text-gray-200">
+          Intervalo de sincronización
+          <select
+            name="supplierSyncInterval"
+            defaultValue={settings.supplierSyncInterval}
+            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+          >
+            {supplierSyncIntervalOptions.map(minutes => (
+              <option key={minutes} value={minutes}>{minutes < 60 ? `${minutes} minutos` : `${minutes / 60} hora${minutes === 60 ? '' : 's'}`}</option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">Con pocos productos publicados, una sincronización diaria conserva la cuota de QStash sin perder control de stock.</span>
+        </label>
 
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold text-gray-900 dark:text-white">Automatizaciones</legend>

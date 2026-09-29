@@ -5,6 +5,7 @@ import {
   enqueueDropshippingJob,
   dispatchScheduledDropshippingJobs,
   ensureDropshippingQStashSchedule,
+  dropshippingScheduleCron,
   executeDropshippingJob,
   optionsForDropshippingJob,
   processDropshippingQStashJob,
@@ -120,16 +121,30 @@ describe('dropshipping jobs', () => {
       create: vi.fn().mockResolvedValue({ scheduleId: 'schedule-1' }),
       delete: vi.fn().mockResolvedValue(undefined),
     };
-    await expect(ensureDropshippingQStashSchedule(schedules)).resolves.toEqual({
+    await expect(ensureDropshippingQStashSchedule(15, schedules)).resolves.toEqual({
       scheduleId: 'schedule-1', repaired: true, removedDuplicates: 1,
     });
     expect(schedules.create).toHaveBeenCalledWith(expect.objectContaining({
       scheduleId: 'schedule-1',
       destination: 'https://www.smartbrew.tech/api/queue/dropshipping',
-      cron: '* * * * *',
+      cron: '*/15 * * * *',
       body: JSON.stringify({ schedule: 'dropshipping' }),
     }));
     expect(schedules.delete).toHaveBeenCalledWith('schedule-duplicate');
+  });
+
+  it.each([
+    [15, '*/15 * * * *'],
+    [30, '*/30 * * * *'],
+    [60, '0 * * * *'],
+    [120, '0 */2 * * *'],
+    [1440, '0 0 * * *'],
+  ])('maps a %i minute interval to a bounded cron', (minutes, cron) => {
+    expect(dropshippingScheduleCron(minutes)).toBe(cron);
+  });
+
+  it('rejects the one-minute schedule that exhausts QStash Free', () => {
+    expect(() => dropshippingScheduleCron(1)).toThrow('incompatible');
   });
 
   it('dispatches the supplier, stock and price chain through QStash when due', async () => {

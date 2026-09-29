@@ -16,9 +16,12 @@ QSTASH_NEXT_SIGNING_KEY=
 ```
 
 Guardar `/admin/settings/dropshipping` crea o repara un único schedule con la
-etiqueta `smartbrew-dropshipping-sync`. QStash llama al endpoint cada minuto y
-SmartBrew sólo despacha la cadena cuando se cumple el intervalo configurado en
-el dashboard.
+etiqueta `smartbrew-dropshipping-sync`. El cron de QStash usa directamente el
+intervalo configurado en el dashboard. Los intervalos admitidos comienzan en 15
+minutos para que el schedule y su cadena de tres trabajos no agoten por sí solos
+el límite diario de QStash Free. La comprobación durable del último despacho se
+mantiene como protección adicional ante reentregas. Para el volumen inicial de
+SmartBrew, el valor predeterminado es una ejecución diaria.
 
 ## Cadena periódica
 

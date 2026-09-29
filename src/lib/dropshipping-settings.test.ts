@@ -19,7 +19,7 @@ describe('dropshipping settings', () => {
     form.set('minimumProfit', '1000');
     form.set('minimumStock', '2');
     form.set('priceChangeLimit', '15');
-    form.set('supplierSyncInterval', '10');
+    form.set('supplierSyncInterval', '15');
     form.set('autoPauseNoStock', 'on');
     expect(parseDropshippingSettings(form)).toMatchObject({
       success: true,
@@ -32,7 +32,7 @@ describe('dropshipping settings', () => {
         autoPauseNoStock: true,
         autoSupplierPurchase: false,
         priceChangeLimit: 15,
-        supplierSyncInterval: 10,
+        supplierSyncInterval: 15,
       },
     });
   });
@@ -44,6 +44,16 @@ describe('dropshipping settings', () => {
     form.set('minimumStock', '-1');
     form.set('priceChangeLimit', '200');
     form.set('supplierSyncInterval', '0');
+    expect(parseDropshippingSettings(form).success).toBe(false);
+  });
+
+  it('rejects a one-minute interval that would exhaust QStash Free', () => {
+    const form = new FormData();
+    form.set('minimumMargin', '20');
+    form.set('minimumProfit', '0');
+    form.set('minimumStock', '1');
+    form.set('priceChangeLimit', '20');
+    form.set('supplierSyncInterval', '1');
     expect(parseDropshippingSettings(form).success).toBe(false);
   });
 

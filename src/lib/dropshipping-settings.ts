@@ -2,6 +2,8 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { portalDb } from './portal';
 
+export const supplierSyncIntervalOptions = [15, 20, 30, 60, 120, 180, 240, 360, 480, 720, 1_440] as const;
+
 export const dropshippingSettingsDefaults = {
   minimumMargin: 20,
   minimumProfit: 0,
@@ -11,7 +13,7 @@ export const dropshippingSettingsDefaults = {
   autoPauseNoStock: true,
   autoSupplierPurchase: false,
   priceChangeLimit: 20,
-  supplierSyncInterval: 15,
+  supplierSyncInterval: 1_440,
 } as const;
 
 export type DropshippingSettings = {
@@ -35,7 +37,10 @@ const schema = z.object({
   autoPauseNoStock: z.boolean(),
   autoSupplierPurchase: z.boolean(),
   priceChangeLimit: z.coerce.number().finite().min(0).max(100),
-  supplierSyncInterval: z.coerce.number().int().min(1).max(1_440),
+  supplierSyncInterval: z.coerce.number().int().refine(
+    value => supplierSyncIntervalOptions.some(option => option === value),
+    'Elegí un intervalo compatible con el scheduler (mínimo 15 minutos).',
+  ),
 });
 
 type SettingsStore = Pick<typeof portalDb, 'dropshippingSettings'>;
@@ -60,7 +65,9 @@ function normalized(row: {
     autoPauseNoStock: row.autoPauseNoStock,
     autoSupplierPurchase: row.autoSupplierPurchase,
     priceChangeLimit: Number(row.priceChangeLimit),
-    supplierSyncInterval: row.supplierSyncInterval,
+    supplierSyncInterval: supplierSyncIntervalOptions.some(option => option === row.supplierSyncInterval)
+      ? row.supplierSyncInterval
+      : dropshippingSettingsDefaults.supplierSyncInterval,
   };
 }
 

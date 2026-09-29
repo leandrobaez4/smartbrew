@@ -4,7 +4,7 @@ import { JobStatus, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { portalDb } from './portal';
 import { withDistributedLock } from './distributed-lock';
-import { getDropshippingSettings } from './dropshipping-settings';
+import { getDropshippingSettings, supplierSyncIntervalOptions } from './dropshipping-settings';
 import { createSupplierOrder } from './supplier-order-service';
 import { publishSupplierProduct, PublishSupplierProductInput } from './supplier-marketplace-publication';
 import { syncMarketplaceFees } from './mercado-libre-fees';
@@ -164,7 +164,17 @@ export async function processDropshippingQStashJob(
   }, dependencies);
 }
 
-export async function ensureDropshippingQStashSchedule(scheduleClient?: QStashScheduleClient) {
+export function dropshippingScheduleCron(intervalMinutes: number) {
+  if (!supplierSyncIntervalOptions.some(option => option === intervalMinutes)) {
+    throw new Error('Intervalo de sincronización incompatible con QStash.');
+  }
+  if (intervalMinutes < 60) return `*/${intervalMinutes} * * * *`;
+  if (intervalMinutes === 60) return '0 * * * *';
+  if (intervalMinutes === 1_440) return '0 0 * * *';
+  return `0 */${intervalMinutes / 60} * * *`;
+}
+
+export async function ensureDropshippingQStashSchedule(intervalMinutes: number, scheduleClient?: QStashScheduleClient) {
   const config = qstashConfig();
   const schedules = scheduleClient || new Client({ token: config.token }).schedules;
   const existing = (await schedules.list()).filter((schedule) => schedule.labels?.includes(scheduleLabel));
@@ -172,7 +182,7 @@ export async function ensureDropshippingQStashSchedule(scheduleClient?: QStashSc
     destination: config.destination,
     body: JSON.stringify({ schedule: 'dropshipping' }),
     headers: qstashHeaders(),
-    cron: '* * * * *',
+    cron: dropshippingScheduleCron(intervalMinutes),
     retries: 2,
     timeout: 90,
     flowControl: { key: 'smartbrew-dropshipping-schedule', parallelism: 1 },

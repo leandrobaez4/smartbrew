@@ -14,7 +14,7 @@ export async function updateDropshippingSettingsAction(formData: FormData) {
     redirect(`/admin/settings/dropshipping?error=${encodeURIComponent(message)}`);
   }
   try {
-    await ensureDropshippingQStashSchedule();
+    await ensureDropshippingQStashSchedule(parsed.data.supplierSyncInterval);
     await saveDropshippingSettings(parsed.data);
   } catch (error) {
     const message = error instanceof Error && (error.message.includes('Configurá QStash') || error.message.includes('APP_URL'))
