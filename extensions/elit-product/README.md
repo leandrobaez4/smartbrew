@@ -5,7 +5,7 @@ La extensión selecciona un extractor registrado según la URL de la pestaña ac
 Proveedores registrados:
 
 - Elit: extracción operativa y compatible con el flujo existente.
-- Unidrop: URL reconocida; la extracción de la ficha se implementa por separado.
+- Unidrop: extrae una oferta por variante con costo ARS, stock, imágenes, peso, medidas, descripción y atributos visibles.
 
 ## Instalación y prueba manual
 
@@ -18,6 +18,8 @@ Proveedores registrados:
 7. En el dashboard completá o corregí precio, cambio, costos, comisión y margen. La base sólo cambia al confirmar el formulario.
 
 El botón **Configurar en SmartBrew** se habilita después de cualquier extracción válida. Si Elit no expone el precio o el tipo de cambio, esos campos se abren en cero para completarlos manualmente en SmartBrew.
+
+En Unidrop, una ficha con una sola variante se puede configurar directamente. Si hay varias variantes, la extensión prepara un snapshot por SKU y exige seleccionar una antes de continuar. El costo de envío informado para Tiendanube se conserva solamente como referencia y no se aplica a Mercado Libre.
 
 El traspaso abre SmartBrew con un comando versionado que identifica al proveedor, el producto y el snapshot extraído. SmartBrew lo valida y lo procesa con el mismo Adapter, Factory y pipeline de importación que usan los demás proveedores. No incluye cookies ni credenciales, pero los datos del producto y su costo pueden quedar visibles en el historial del navegador y en registros de navegación.
 
