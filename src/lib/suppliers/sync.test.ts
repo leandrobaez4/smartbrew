@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SupplierConnector, SupplierConnectorFactory } from './connectors';
 import { registerMockSupplierConnector } from './mock';
 import { registerElitSnapshotConnector } from './elit-snapshot';
+import { registerUnidropSnapshotConnector } from './unidrop-snapshot';
 import { supplierSyncIntervalMs, syncSuppliers } from './sync';
 
 function supplier(id: string) {
@@ -78,6 +79,20 @@ describe('supplier catalog synchronization', () => {
     const factory = registerElitSnapshotConnector(new SupplierConnectorFactory(integrationLogger));
     const elit = { ...supplier('elit-supplier'), type: 'elit-snapshot-v1', integrationType: SupplierIntegrationType.SCRAPING };
     const store = { supplier: { findMany: vi.fn().mockResolvedValue([elit]) } };
+    const importProducts = vi.fn();
+    const logger = vi.fn().mockResolvedValue(undefined);
+
+    const result = await syncSuppliers({ store: store as never, factory, logger, importProducts });
+
+    expect(result).toMatchObject({ processed: 1, succeeded: 0, failed: 0, skipped: 1 });
+    expect(importProducts).not.toHaveBeenCalled();
+  });
+
+  it('skips Unidrop because browser snapshots do not expose a catalog API', async () => {
+    const integrationLogger = { info: vi.fn().mockResolvedValue(undefined), error: vi.fn().mockResolvedValue(undefined) };
+    const factory = registerUnidropSnapshotConnector(new SupplierConnectorFactory(integrationLogger));
+    const unidrop = { ...supplier('unidrop-supplier'), type: 'unidrop-snapshot-v1', integrationType: SupplierIntegrationType.SCRAPING };
+    const store = { supplier: { findMany: vi.fn().mockResolvedValue([unidrop]) } };
     const importProducts = vi.fn();
     const logger = vi.fn().mockResolvedValue(undefined);
 

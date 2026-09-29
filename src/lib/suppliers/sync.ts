@@ -8,13 +8,14 @@ import { registerElitApiConnector } from './elit-api';
 import { registerElitSnapshotConnector } from './elit-snapshot';
 import { registerManualSupplierConnector } from './manual';
 import { registerMockSupplierConnector } from './mock';
+import { registerUnidropSnapshotConnector } from './unidrop-snapshot';
 
 type SupplierStore = Pick<typeof portalDb, 'supplier'>;
 type SyncLogger = typeof logSystemEvent;
 
-export const supplierConnectorFactory = registerElitApiConnector(
+export const supplierConnectorFactory = registerElitApiConnector(registerUnidropSnapshotConnector(
   registerElitSnapshotConnector(registerManualSupplierConnector(registerMockSupplierConnector(new SupplierConnectorFactory()))),
-);
+));
 
 function credential(value: string | null, supplierId: string, field: string) {
   return value ? openSupplierCredential(value, supplierId, field) : undefined;
