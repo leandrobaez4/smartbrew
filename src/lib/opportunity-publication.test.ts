@@ -12,6 +12,7 @@ describe('opportunity publication readiness', () => {
     [{ ...ready, accountId: '' }, 'Conectá una cuenta'],
     [{ ...ready, listingStatus: 'ACTIVE' }, 'ya tiene una publicación'],
     [{ ...ready, stock: 0 }, 'no tiene stock'],
+    [{ ...ready, snapshotExpired: true }, 'snapshot de Unidrop venció'],
     [{ ...ready, editorialStatus: 'READY' }, 'aprobá el contenido'],
   ])('explains why publishing is disabled', (input, message) => {
     expect(opportunityPublicationDisabledReason(input)).toContain(message);

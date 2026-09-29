@@ -20,6 +20,8 @@ describe('dropshipping settings', () => {
     form.set('minimumStock', '2');
     form.set('priceChangeLimit', '15');
     form.set('supplierSyncInterval', '15');
+    form.set('snapshotFreshHours', '24');
+    form.set('snapshotExpiredHours', '72');
     form.set('autoPauseNoStock', 'on');
     expect(parseDropshippingSettings(form)).toMatchObject({
       success: true,
@@ -33,6 +35,8 @@ describe('dropshipping settings', () => {
         autoSupplierPurchase: false,
         priceChangeLimit: 15,
         supplierSyncInterval: 15,
+        snapshotFreshHours: 24,
+        snapshotExpiredHours: 72,
       },
     });
   });
@@ -44,6 +48,8 @@ describe('dropshipping settings', () => {
     form.set('minimumStock', '-1');
     form.set('priceChangeLimit', '200');
     form.set('supplierSyncInterval', '0');
+    form.set('snapshotFreshHours', '72');
+    form.set('snapshotExpiredHours', '24');
     expect(parseDropshippingSettings(form).success).toBe(false);
   });
 
@@ -54,6 +60,8 @@ describe('dropshipping settings', () => {
     form.set('minimumStock', '1');
     form.set('priceChangeLimit', '20');
     form.set('supplierSyncInterval', '1');
+    form.set('snapshotFreshHours', '24');
+    form.set('snapshotExpiredHours', '72');
     expect(parseDropshippingSettings(form).success).toBe(false);
   });
 

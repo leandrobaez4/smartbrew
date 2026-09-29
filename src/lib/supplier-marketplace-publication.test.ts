@@ -186,4 +186,18 @@ describe('supplier marketplace publication', () => {
     await expect(publishSupplierProduct(request, deps)).rejects.toThrow('revisarse y aprobarse');
     expect(deps.publisher.publish).not.toHaveBeenCalled();
   });
+
+  it('requires a new verification before publishing an expired Unidrop snapshot', async () => {
+    const deps = dependencies({
+      findProduct: vi.fn().mockResolvedValue({
+        ...product,
+        lastSyncAt: new Date('2026-09-20T00:00:00.000Z'),
+        supplier: { ...product.supplier, type: 'unidrop-snapshot-v1', slug: 'unidrop' },
+      }),
+      snapshotExpiredHours: 72,
+      now: new Date('2026-09-29T18:00:00.000Z'),
+    });
+    await expect(publishSupplierProduct(request, deps)).rejects.toThrow('snapshot de Unidrop venció');
+    expect(deps.publisher.publish).not.toHaveBeenCalled();
+  });
 });

@@ -14,6 +14,8 @@ export const dropshippingSettingsDefaults = {
   autoSupplierPurchase: false,
   priceChangeLimit: 20,
   supplierSyncInterval: 1_440,
+  snapshotFreshHours: 24,
+  snapshotExpiredHours: 72,
 } as const;
 
 export type DropshippingSettings = {
@@ -26,6 +28,8 @@ export type DropshippingSettings = {
   autoSupplierPurchase: boolean;
   priceChangeLimit: number;
   supplierSyncInterval: number;
+  snapshotFreshHours: number;
+  snapshotExpiredHours: number;
 };
 
 const schema = z.object({
@@ -41,7 +45,12 @@ const schema = z.object({
     value => supplierSyncIntervalOptions.some(option => option === value),
     'Elegí un intervalo compatible con el scheduler (mínimo 15 minutos).',
   ),
-});
+  snapshotFreshHours: z.coerce.number().int().min(1).max(720),
+  snapshotExpiredHours: z.coerce.number().int().min(2).max(2_160),
+}).refine(
+  value => value.snapshotFreshHours < value.snapshotExpiredHours,
+  { path: ['snapshotExpiredHours'], message: 'El vencimiento debe ser posterior al umbral por vencer.' },
+);
 
 type SettingsStore = Pick<typeof portalDb, 'dropshippingSettings'>;
 
@@ -55,6 +64,8 @@ function normalized(row: {
   autoSupplierPurchase: boolean;
   priceChangeLimit: Prisma.Decimal;
   supplierSyncInterval: number;
+  snapshotFreshHours: number;
+  snapshotExpiredHours: number;
 }): DropshippingSettings {
   return {
     minimumMargin: Number(row.minimumMargin),
@@ -68,6 +79,8 @@ function normalized(row: {
     supplierSyncInterval: supplierSyncIntervalOptions.some(option => option === row.supplierSyncInterval)
       ? row.supplierSyncInterval
       : dropshippingSettingsDefaults.supplierSyncInterval,
+    snapshotFreshHours: row.snapshotFreshHours,
+    snapshotExpiredHours: row.snapshotExpiredHours,
   };
 }
 
@@ -91,6 +104,8 @@ export function parseDropshippingSettings(formData: FormData) {
     autoSupplierPurchase: checked(formData.get('autoSupplierPurchase')),
     priceChangeLimit: formData.get('priceChangeLimit'),
     supplierSyncInterval: formData.get('supplierSyncInterval'),
+    snapshotFreshHours: formData.get('snapshotFreshHours'),
+    snapshotExpiredHours: formData.get('snapshotExpiredHours'),
   });
 }
 

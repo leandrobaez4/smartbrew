@@ -43,6 +43,7 @@ function listedProduct(id: string, supplierId = 'supplier-1') {
       images: [],
       attributes: null,
       rawData: {},
+      lastSyncAt: new Date('2026-09-28T17:00:00.000Z'),
       supplier: supplier(supplierId),
     },
   };
@@ -128,5 +129,28 @@ describe('published supplier product monitoring', () => {
       'WARN', 'supplier_product_monitor', 'Published supplier product monitoring finished',
       expect.objectContaining({ inspected: 1, succeeded: 0, failed: 1 }),
     );
+  });
+
+  it('only emits an age alert for Unidrop and never queries its snapshot connector', async () => {
+    const item = listedProduct('product-1');
+    item.supplierProduct.supplier = { ...item.supplierProduct.supplier, type: 'unidrop-snapshot-v1' };
+    item.supplierProduct.lastSyncAt = new Date('2026-09-20T18:00:00.000Z');
+    const store = { marketplaceListing: { findMany: vi.fn().mockResolvedValue([item]) } };
+    const factory = { make: vi.fn() };
+    const logger = vi.fn().mockResolvedValue(undefined);
+
+    const result = await monitorPublishedSupplierProducts({
+      store: store as never,
+      factory: factory as never,
+      importProducts: vi.fn(),
+      logger,
+      syncedAt,
+      snapshotFreshHours: 24,
+      snapshotExpiredHours: 72,
+    });
+
+    expect(factory.make).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ inspected: 1, skipped: 1, failed: 0 });
+    expect(logger).toHaveBeenCalledWith('WARN', 'supplier_snapshot_age', 'Manual supplier snapshot expired', expect.objectContaining({ freshness: 'EXPIRED' }));
   });
 });

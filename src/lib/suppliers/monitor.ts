@@ -4,6 +4,7 @@ import { portalDb } from '../portal';
 import { importSupplierProducts } from './catalog';
 import { SupplierConnectorFactory, SupplierProduct } from './connectors';
 import { supplierConnectorConfig, supplierConnectorFactory } from './sync';
+import { supplierSnapshotFreshness } from '../supplier-snapshot-freshness';
 
 type MonitorStore = Pick<typeof portalDb, 'marketplaceListing'>;
 type MonitorLogger = typeof logSystemEvent;
@@ -21,6 +22,8 @@ export async function monitorPublishedSupplierProducts(options: {
   logger?: MonitorLogger;
   importProducts?: typeof importSupplierProducts;
   syncedAt?: Date;
+  snapshotFreshHours?: number;
+  snapshotExpiredHours?: number;
 } = {}) {
   const store = options.store || portalDb;
   const factory = options.factory || supplierConnectorFactory;
@@ -53,6 +56,7 @@ export async function monitorPublishedSupplierProducts(options: {
           images: true,
           attributes: true,
           rawData: true,
+          lastSyncAt: true,
           supplier: true,
         },
       },
@@ -76,6 +80,24 @@ export async function monitorPublishedSupplierProducts(options: {
       externalId: current.externalId,
     };
     try {
+      if (current.supplier.type === 'unidrop-snapshot-v1') {
+        const freshness = supplierSnapshotFreshness({
+          verifiedAt: current.lastSyncAt,
+          freshHours: options.snapshotFreshHours ?? 24,
+          expiredHours: options.snapshotExpiredHours ?? 72,
+          now: syncedAt,
+        });
+        results.push({ ...details, status: 'skipped' });
+        await logger(freshness.status === 'EXPIRED' ? 'WARN' : 'INFO', 'supplier_snapshot_age', freshness.status === 'EXPIRED'
+          ? 'Manual supplier snapshot expired'
+          : 'Manual supplier snapshot age checked', {
+          ...details,
+          freshness: freshness.status,
+          ageHours: freshness.ageHours,
+          verifiedAt: current.lastSyncAt,
+        });
+        continue;
+      }
       const connector = factory.make(supplierConnectorConfig(current.supplier));
       let product: SupplierProduct | null = null;
       if (connector.supports('product')) {

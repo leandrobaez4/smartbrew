@@ -47,6 +47,8 @@ const getSettings = vi.fn().mockResolvedValue({
   autoSupplierPurchase: false,
   priceChangeLimit: 20,
   supplierSyncInterval: 15,
+  snapshotFreshHours: 24,
+  snapshotExpiredHours: 72,
 });
 
 describe('dropshipping jobs', () => {
@@ -234,10 +236,14 @@ describe('dropshipping jobs', () => {
         data: { executionId: 'execution-1', supplierId: 'supplier-1' },
         attemptsMade: 0,
         opts: { attempts: 4 },
-      } as never, { handlers: operations as never, store: database as never, withLock });
+      } as never, { handlers: operations as never, store: database as never, withLock, getSettings });
     }
     expect(operations.monitorPublishedSupplierProducts).toHaveBeenCalledTimes(2);
-    expect(operations.monitorPublishedSupplierProducts).toHaveBeenCalledWith({ supplierId: 'supplier-1' });
+    expect(operations.monitorPublishedSupplierProducts).toHaveBeenCalledWith({
+      supplierId: 'supplier-1',
+      snapshotFreshHours: 24,
+      snapshotExpiredHours: 72,
+    });
     expect(operations.syncSuppliers).not.toHaveBeenCalled();
   });
 
@@ -285,7 +291,7 @@ describe('dropshipping jobs', () => {
       data: { executionId: 'execution-1' },
       attemptsMade: 0,
       opts: { attempts: 4 },
-    } as never, { handlers: operations as never, store: database as never, withLock })).rejects.toThrow('all supplier requests failed');
+    } as never, { handlers: operations as never, store: database as never, withLock, getSettings })).rejects.toThrow('all supplier requests failed');
 
     expect(database.jobExecution.update).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: JobStatus.STARTED, attemptCount: 1, finishedAt: null }),

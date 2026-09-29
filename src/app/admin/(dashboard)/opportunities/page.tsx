@@ -5,6 +5,8 @@ import { opportunityPublicationDisabledReason } from '@/lib/opportunity-publicat
 import { compareSupplierPvp, resolveSupplierPvpArs } from '@/lib/supplier-pvp-comparison';
 import PublishOpportunityButton from './PublishOpportunityButton';
 import { supplierPackageDefaults } from '@/lib/supplier-package';
+import { getDropshippingSettings } from '@/lib/dropshipping-settings';
+import { supplierSnapshotFreshness, supplierSourceUrl } from '@/lib/supplier-snapshot-freshness';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +49,7 @@ export default async function OpportunitiesPage({ searchParams }: {
     minimumMarginPercentage: configuredNumber('MINIMUM_PROFIT_PERCENTAGE', 20),
     minimumProfitAmount: configuredNumber('MINIMUM_PROFIT_AMOUNT', 0),
   };
-  const products = await portalDb.supplierProduct.findMany({
+  const [products, settings, connectedMarketplace] = await Promise.all([portalDb.supplierProduct.findMany({
     where: { active: true, cost: { not: null }, supplier: { status: 'ACTIVE' } },
     include: {
       supplier: true,
@@ -57,7 +59,11 @@ export default async function OpportunitiesPage({ searchParams }: {
       _count: { select: { orders: true } },
     },
     orderBy: { title: 'asc' },
-  });
+  }), getDropshippingSettings(), portalDb.marketplaceOAuthCredential.findFirst({
+    where: { marketplace: 'MERCADO_LIBRE' },
+    orderBy: { updatedAt: 'desc' },
+    select: { accountId: true },
+  })]);
   const calculatedOpportunities = calculateOpportunities(products.map((product) => ({
     ...product,
     cost: product.cost == null ? null : Number(product.cost),
@@ -68,16 +74,27 @@ export default async function OpportunitiesPage({ searchParams }: {
   const pricingByProduct = new Map(products.flatMap((product) => product.pricing ? [[product.id, product.pricing] as const] : []));
   const listingByProduct = new Map(products.flatMap((product) => product.listings[0] ? [[product.id, product.listings[0]] as const] : []));
   const packageByProduct = new Map(products.map((product) => [product.id, supplierPackageDefaults(product)]));
+  const productById = new Map(products.map((product) => [product.id, product]));
   const opportunities = calculatedOpportunities.map((row) => {
+    const product = productById.get(row.id)!;
     const saved = pricingByProduct.get(row.id);
     const listing = listingByProduct.get(row.id);
+    const freshness = product.supplier.type === 'unidrop-snapshot-v1' ? supplierSnapshotFreshness({
+      verifiedAt: product.lastSyncAt,
+      marketplaceSyncedAt: listing?.lastSyncAt,
+      listingStatus: listing?.status,
+      stock: product.stock,
+      freshHours: settings.snapshotFreshHours,
+      expiredHours: settings.snapshotExpiredHours,
+    }) : null;
+    const sourceUrl = product.supplier.type === 'unidrop-snapshot-v1' ? supplierSourceUrl(product.rawData) : null;
     const supplierPvpArs = saved ? resolveSupplierPvpArs({
       supplierPvpArs: Number(saved.supplierPvpArs || 0),
       supplierPvpUsd: Number(saved.supplierPvpUsd || 0),
       exchangeRateArsPerUsd: Number(saved.exchangeRateArsPerUsd),
     }) : null;
     const pvpComparison = compareSupplierPvp(supplierPvpArs, listing?.price == null ? null : Number(listing.price));
-    if (!saved) return { ...row, pvpComparison };
+    if (!saved) return { ...row, pvpComparison, freshness, sourceUrl, verifiedAt: product.lastSyncAt, marketplaceSyncedAt: listing?.lastSyncAt || null };
     const profit = Number(saved.targetProfitArs);
     return {
       ...row,
@@ -86,15 +103,14 @@ export default async function OpportunitiesPage({ searchParams }: {
       marginPercentage: Number(saved.netMarginPercentage),
       roi: Number(saved.roiPercentage),
       pvpComparison,
+      freshness,
+      sourceUrl,
+      verifiedAt: product.lastSyncAt,
+      marketplaceSyncedAt: listing?.lastSyncAt || null,
     };
   });
   const suppliers = [...new Map(products.map((product) => [product.supplier.id, product.supplier])).values()];
   const categories = [...new Set(products.flatMap((product) => product.category ? [product.category] : []))].sort();
-  const connectedMarketplace = await portalDb.marketplaceOAuthCredential.findFirst({
-    where: { marketplace: 'MERCADO_LIBRE' },
-    orderBy: { updatedAt: 'desc' },
-    select: { accountId: true },
-  });
   const accountId = connectedMarketplace?.accountId || process.env.MERCADO_LIBRE_ACCOUNT_ID || '';
   const publicationCosts = {
     marketplaceFee: config.marketplaceFee,
@@ -116,11 +132,11 @@ export default async function OpportunitiesPage({ searchParams }: {
         <div className="flex gap-2"><select name="sort" defaultValue={filters.sort} className="min-w-0 flex-1 rounded border p-2 dark:border-gray-700 dark:bg-gray-950"><option value="score">Mayor score</option><option value="margin">Mayor margen</option><option value="roi">Mayor ROI</option><option value="profit">Mayor ganancia</option><option value="cost">Menor costo</option></select><button className="rounded bg-gray-900 px-4 py-2 text-white dark:bg-gray-100 dark:text-gray-950">Aplicar</button></div>
       </form>
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow dark:border-gray-800 dark:bg-gray-900"><table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-950"><tr>{['Producto', 'Score', 'Proveedor', 'Costo', 'Stock', 'Precio recomendado', 'PVP vs. publicación', 'Ganancia estimada', 'Margen', 'ROI', 'Estado', 'Acción'].map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr></thead><tbody className="divide-y divide-gray-200 dark:divide-gray-800">{opportunities.map((row) => {
-        const disabledReason = opportunityPublicationDisabledReason({ accountId, stock: row.stock, listingStatus: row.listingStatus, editorialStatus: row.editorialStatus });
+        const disabledReason = opportunityPublicationDisabledReason({ accountId, stock: row.stock, listingStatus: row.listingStatus, editorialStatus: row.editorialStatus, snapshotExpired: row.freshness?.status === 'EXPIRED' });
         const reviewHref = row.editorialStatus !== 'APPROVED' && disabledReason?.includes('aprobá el contenido')
           ? `/admin/opportunities/${row.id}#contenido-publicar`
           : undefined;
-        return <tr key={row.id}><td className="px-4 py-3"><Link href={`/admin/opportunities/${row.id}`} className="font-semibold text-blue-600 hover:underline dark:text-blue-400">{row.editorialTitle || row.title}</Link><p className="text-xs text-gray-500">{row.category || 'Sin categoría'} · SKU {row.sku || '—'} · contenido {row.editorialStatus || 'PENDING'}</p>{row.listings[0]?.marketplaceItemId && <a href={`https://articulo.mercadolibre.com.ar/${row.listings[0].marketplaceItemId}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">MLA {row.listings[0].marketplaceItemId}</a>}</td><td className="px-4 py-3"><p className="text-lg font-bold">{row.productScore}</p><p className="text-[11px] text-gray-500" title={`Factores estimados: ${row.estimatedScoreFactors.join(', ') || 'ninguno'}`}>{row.estimatedScoreFactors.length ? `${row.estimatedScoreFactors.length} factor(es) estimado(s)` : 'Datos reales'}</p></td><td className="px-4 py-3 text-sm">{row.supplier.name}</td><td className="px-4 py-3 text-sm">{money(row.cost, row.currency || 'ARS')}</td><td className="px-4 py-3 text-sm">{row.stockReported ? row.stock : <span className="text-amber-700 dark:text-amber-400">Sin informar</span>}</td><td className="px-4 py-3 font-semibold">{money(row.recommendedPrice, row.currency || 'ARS')}</td><td className="px-4 py-3 text-sm">{row.pvpComparison ? <div><p className={row.pvpComparison.position === 'BELOW' ? 'font-semibold text-red-700 dark:text-red-400' : row.pvpComparison.position === 'ABOVE' ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'font-semibold'}>{row.pvpComparison.position === 'BELOW' ? 'Debajo' : row.pvpComparison.position === 'ABOVE' ? 'Encima' : 'Igual'} {Math.abs(row.pvpComparison.differencePercentage).toFixed(2)}%</p><p className="whitespace-nowrap text-xs text-gray-500">PVP {money(row.pvpComparison.supplierPvpArs)} · ML {money(row.pvpComparison.publishedPriceArs)}</p></div> : <span className="text-xs text-gray-500">Sin PVP o publicación</span>}</td><td className="px-4 py-3 text-sm text-green-700 dark:text-green-400">{money(row.estimatedProfit, row.currency || 'ARS')}</td><td className="px-4 py-3 text-sm">{row.marginPercentage.toFixed(2)}%</td><td className="px-4 py-3 text-sm">{row.roi.toFixed(2)}%</td><td className="px-4 py-3 text-xs font-semibold">{row.stock <= 0 ? 'SIN STOCK' : row.listingStatus}</td><td className="px-4 py-3"><PublishOpportunityButton productId={row.id} accountId={accountId} costs={publicationCosts} packageDefaults={packageByProduct.get(row.id) || {}} disabledReason={disabledReason} reviewHref={reviewHref} /></td></tr>;
+        return <tr key={row.id}><td className="px-4 py-3"><Link href={`/admin/opportunities/${row.id}`} className="font-semibold text-blue-600 hover:underline dark:text-blue-400">{row.editorialTitle || row.title}</Link><p className="text-xs text-gray-500">{row.category || 'Sin categoría'} · SKU {row.sku || '—'} · contenido {row.editorialStatus || 'PENDING'}</p>{row.freshness && <div className="mt-1 text-xs"><p className={row.freshness.status === 'EXPIRED' ? 'font-semibold text-red-700 dark:text-red-400' : row.freshness.status === 'RECENT' ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'font-semibold text-amber-700 dark:text-amber-400'}>Snapshot {row.freshness.status === 'RECENT' ? 'reciente' : row.freshness.status === 'EXPIRING' ? 'por vencer' : row.freshness.status === 'EXPIRED' ? 'vencido' : 'requiere revisión'}</p><p className="text-gray-500">Unidrop {row.verifiedAt.toLocaleString('es-AR')} · ML {row.marketplaceSyncedAt?.toLocaleString('es-AR') || 'sin sincronizar'}</p>{row.sourceUrl && <a href={row.sourceUrl} target="_blank" rel="noreferrer" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">Verificar en Unidrop</a>}</div>}{row.listings[0]?.marketplaceItemId && <a href={`https://articulo.mercadolibre.com.ar/${row.listings[0].marketplaceItemId}`} target="_blank" rel="noreferrer" className="block text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">MLA {row.listings[0].marketplaceItemId}</a>}</td><td className="px-4 py-3"><p className="text-lg font-bold">{row.productScore}</p><p className="text-[11px] text-gray-500" title={`Factores estimados: ${row.estimatedScoreFactors.join(', ') || 'ninguno'}`}>{row.estimatedScoreFactors.length ? `${row.estimatedScoreFactors.length} factor(es) estimado(s)` : 'Datos reales'}</p></td><td className="px-4 py-3 text-sm">{row.supplier.name}</td><td className="px-4 py-3 text-sm">{money(row.cost, row.currency || 'ARS')}</td><td className="px-4 py-3 text-sm">{row.stockReported ? row.stock : <span className="text-amber-700 dark:text-amber-400">Sin informar</span>}</td><td className="px-4 py-3 font-semibold">{money(row.recommendedPrice, row.currency || 'ARS')}</td><td className="px-4 py-3 text-sm">{row.pvpComparison ? <div><p className={row.pvpComparison.position === 'BELOW' ? 'font-semibold text-red-700 dark:text-red-400' : row.pvpComparison.position === 'ABOVE' ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'font-semibold'}>{row.pvpComparison.position === 'BELOW' ? 'Debajo' : row.pvpComparison.position === 'ABOVE' ? 'Encima' : 'Igual'} {Math.abs(row.pvpComparison.differencePercentage).toFixed(2)}%</p><p className="whitespace-nowrap text-xs text-gray-500">PVP {money(row.pvpComparison.supplierPvpArs)} · ML {money(row.pvpComparison.publishedPriceArs)}</p></div> : <span className="text-xs text-gray-500">Sin PVP o publicación</span>}</td><td className="px-4 py-3 text-sm text-green-700 dark:text-green-400">{money(row.estimatedProfit, row.currency || 'ARS')}</td><td className="px-4 py-3 text-sm">{row.marginPercentage.toFixed(2)}%</td><td className="px-4 py-3 text-sm">{row.roi.toFixed(2)}%</td><td className="px-4 py-3 text-xs font-semibold">{row.stock <= 0 ? 'SIN STOCK' : row.listingStatus}</td><td className="px-4 py-3"><PublishOpportunityButton productId={row.id} accountId={accountId} costs={publicationCosts} packageDefaults={packageByProduct.get(row.id) || {}} disabledReason={disabledReason} reviewHref={reviewHref} /></td></tr>;
       })}{!opportunities.length && <tr><td colSpan={12} className="px-4 py-10 text-center text-sm text-gray-500">No hay oportunidades que coincidan con los filtros.</td></tr>}</tbody></table></div>
   </div>;
 }

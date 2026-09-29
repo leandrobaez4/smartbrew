@@ -13,6 +13,11 @@ const numberFields = [
   ['priceChangeLimit', 'Límite de cambio de precio (%)', '0.01'],
 ] as const;
 
+const snapshotFields = [
+  ['snapshotFreshHours', 'Empieza a vencer después de (horas)'],
+  ['snapshotExpiredHours', 'Vence después de (horas)'],
+] as const;
+
 const booleanFields = [
   ['autoPublish', 'Publicación automática'],
   ['autoUpdatePrices', 'Actualización automática de precios'],
@@ -62,6 +67,19 @@ export default async function DropshippingSettingsPage({ searchParams }: Props) 
           </select>
           <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">Con pocos productos publicados, una sincronización diaria conserva la cuota de QStash sin perder control de stock.</span>
         </label>
+
+        <fieldset>
+          <legend className="text-sm font-semibold text-gray-900 dark:text-white">Frescura de snapshots manuales</legend>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Aplica a proveedores sin API, como Unidrop. QStash solo alerta por antigüedad: no consulta el sitio.</p>
+          <div className="mt-3 grid gap-5 sm:grid-cols-2">
+            {snapshotFields.map(([name, label]) => (
+              <label key={name} className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                {label}
+                <input name={name} type="number" min="1" max="2160" step="1" defaultValue={settings[name]} required className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <fieldset className="space-y-3">
           <legend className="text-sm font-semibold text-gray-900 dark:text-white">Automatizaciones</legend>

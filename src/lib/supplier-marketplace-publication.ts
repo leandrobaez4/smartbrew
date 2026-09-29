@@ -34,6 +34,8 @@ type PublicationDependencies = {
   minimumMarginPercentage?: number;
   minimumProfitAmount?: number;
   dryRun?: boolean;
+  snapshotExpiredHours?: number;
+  now?: Date;
 };
 
 function configNumber(name: string, fallback: number) {
@@ -61,7 +63,7 @@ function validImages(images: string[]) {
   });
 }
 
-function validateProduct(product: ProductWithSupplier) {
+function validateProduct(product: ProductWithSupplier, snapshotExpiredHours = 72, now = new Date()) {
   if (product.supplier.status !== 'ACTIVE') throw new Error('El proveedor no está activo.');
   if (!product.active) throw new Error('El producto del proveedor no está activo.');
   if ((product.stock ?? 0) <= 0) throw new Error('El producto no tiene stock.');
@@ -79,6 +81,10 @@ function validateProduct(product: ProductWithSupplier) {
   }
   if (!product.editorialTitle?.trim() || !product.editorialDescription?.trim()) {
     throw new Error('El contenido editorial aprobado está incompleto.');
+  }
+  if (product.supplier.type === 'unidrop-snapshot-v1'
+    && now.getTime() - product.lastSyncAt.getTime() >= snapshotExpiredHours * 3_600_000) {
+    throw new Error('El snapshot de Unidrop venció. Verificá nuevamente precio y stock antes de publicar.');
   }
 }
 
@@ -107,7 +113,7 @@ export async function publishSupplierProduct(
   try {
     const product = await findProduct(input.supplierProductId);
     if (!product) throw new Error('No existe el producto del proveedor.');
-    validateProduct(product);
+    validateProduct(product, dependencies.snapshotExpiredHours, dependencies.now);
     const marketplaceCategoryId = (product.pricing?.marketplaceCategoryId || product.category)!.trim();
     const minimumMarginPercentage = dependencies.minimumMarginPercentage
       ?? configNumber('MINIMUM_PROFIT_PERCENTAGE', 20);

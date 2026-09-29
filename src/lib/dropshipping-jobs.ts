@@ -311,7 +311,12 @@ export async function executeDropshippingJob(
       case DropshippingJobName.SupplierStockSyncJob:
       case DropshippingJobName.SupplierPriceSyncJob: {
         const data = syncJob.parse(job.data);
-        return handlers.monitorPublishedSupplierProducts({ supplierId: data.supplierId });
+        const settings = await (dependencies.getSettings || getDropshippingSettings)();
+        return handlers.monitorPublishedSupplierProducts({
+          supplierId: data.supplierId,
+          snapshotFreshHours: settings.snapshotFreshHours,
+          snapshotExpiredHours: settings.snapshotExpiredHours,
+        });
       }
       case DropshippingJobName.MarketplaceStockSyncJob:
       {
@@ -363,6 +368,7 @@ export async function executeDropshippingJob(
         return handlers.publishSupplierProduct(publication, {
           minimumMarginPercentage: settings.minimumMargin,
           minimumProfitAmount: settings.minimumProfit,
+          snapshotExpiredHours: settings.snapshotExpiredHours,
         });
       }
       default:

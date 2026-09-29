@@ -26,6 +26,8 @@ model DropshippingSettings {
   autoSupplierPurchase Boolean  @default(false)
   priceChangeLimit     Decimal  @default(20)
   supplierSyncInterval Int      @default(15)
+  snapshotFreshHours   Int      @default(24)
+  snapshotExpiredHours Int      @default(72)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }

@@ -1,0 +1,3 @@
+ALTER TABLE "DropshippingSettings"
+ADD COLUMN "snapshotFreshHours" INTEGER NOT NULL DEFAULT 24,
+ADD COLUMN "snapshotExpiredHours" INTEGER NOT NULL DEFAULT 72;

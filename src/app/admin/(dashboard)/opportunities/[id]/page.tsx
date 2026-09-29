@@ -6,6 +6,8 @@ import SupplierPricingCalculatorForm from '@/app/admin/(dashboard)/suppliers/imp
 import { inferVatTreatment } from '@/lib/supplier-product-pricing';
 import { supplierPackageDefaults } from '@/lib/supplier-package';
 import { approveSupplierEditorialAction, generateSupplierEditorialAction, updateSupplierProductPricingAction } from './actions';
+import { getDropshippingSettings } from '@/lib/dropshipping-settings';
+import { supplierSnapshotFreshness, supplierSourceUrl } from '@/lib/supplier-snapshot-freshness';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +28,10 @@ export default async function SupplierProductEditorialPage({
 }) {
   await requireAdmin();
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const product = await portalDb.supplierProduct.findUnique({ where: { id }, include: { supplier: true, pricing: true, listings: { orderBy: { updatedAt: 'desc' }, take: 1 } } });
+  const [product, settings] = await Promise.all([
+    portalDb.supplierProduct.findUnique({ where: { id }, include: { supplier: true, pricing: true, listings: { orderBy: { updatedAt: 'desc' }, take: 1 } } }),
+    getDropshippingSettings(),
+  ]);
   if (!product) notFound();
   const generate = generateSupplierEditorialAction.bind(null, id);
   const approve = approveSupplierEditorialAction.bind(null, id);
@@ -39,6 +44,15 @@ export default async function SupplierProductEditorialPage({
   }) : null;
   const listing = product.listings[0];
   const pvpComparison = compareSupplierPvp(supplierPvpArs, listing?.price == null ? null : Number(listing.price));
+  const unidropFreshness = product.supplier.type === 'unidrop-snapshot-v1' ? supplierSnapshotFreshness({
+    verifiedAt: product.lastSyncAt,
+    marketplaceSyncedAt: listing?.lastSyncAt,
+    listingStatus: listing?.status,
+    stock: product.stock,
+    freshHours: settings.snapshotFreshHours,
+    expiredHours: settings.snapshotExpiredHours,
+  }) : null;
+  const sourceUrl = unidropFreshness ? supplierSourceUrl(product.rawData) : null;
 
   return <main className="mx-auto max-w-5xl space-y-6">
     <div>
@@ -64,6 +78,12 @@ export default async function SupplierProductEditorialPage({
 
     {product.supplier.slug === 'unidrop' && <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">Vínculo con Mercado Libre</h2>{listing?.marketplaceItemId ? <p className="mt-1 text-sm">SKU <strong>{product.sku || '—'}</strong> · MLA <a href={`https://articulo.mercadolibre.com.ar/${listing.marketplaceItemId}`} target="_blank" rel="noreferrer" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">{listing.marketplaceItemId}</a> · {listing.status}</p> : <p className="mt-1 text-sm text-gray-500">SKU {product.sku || '—'} todavía sin publicación asociada.</p>}</div><Link href={`/admin/opportunities/${product.id}/link-listing`} className="rounded bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-500">{listing?.marketplaceItemId ? 'Revalidar vínculo' : 'Vincular por SELLER_SKU'}</Link></div>
+    </section>}
+
+    {unidropFreshness && <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-bold">Frescura del snapshot manual</h2><p className="mt-1 text-sm text-gray-500">Precio y stock vienen de una observación de la extensión, no de una API.</p></div>{sourceUrl && <a href={sourceUrl} target="_blank" rel="noreferrer" className="rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">Verificar en Unidrop</a>}</div>
+      <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4"><div><dt className="text-gray-500">Estado</dt><dd className="font-semibold">{unidropFreshness.status === 'RECENT' ? 'Reciente' : unidropFreshness.status === 'EXPIRING' ? 'Por vencer' : unidropFreshness.status === 'EXPIRED' ? 'Vencido' : 'Requiere revisión'}</dd></div><div><dt className="text-gray-500">Última verificación Unidrop</dt><dd>{product.lastSyncAt.toLocaleString('es-AR')}</dd></div><div><dt className="text-gray-500">Última sincronización ML</dt><dd>{listing?.lastSyncAt?.toLocaleString('es-AR') || 'Sin sincronizar'}</dd></div><div><dt className="text-gray-500">Costo / stock observado</dt><dd>{money(Number(product.cost || 0))} · {product.stock ?? 'sin informar'}</dd></div></dl>
+      <p className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{unidropFreshness.recommendation} La extensión guarda una nueva verificación sobre este mismo SKU; SmartBrew no cambia Mercado Libre sin una regla y confirmación aplicables.</p>
     </section>}
 
     {product.pricing && <section className="space-y-4">
