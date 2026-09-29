@@ -104,6 +104,7 @@ describe('dropshipping jobs', () => {
     await enqueueDropshippingJob(DropshippingJobName.MarketplacePublishJob, {
       supplierProductId: 'product-1', marketplaceAccountId: '84259783', marketplaceFee: 0,
       shippingCost: 0, taxes: 0, extraCosts: 0, targetMarginPercentage: 20,
+      heightCm: 8, widthCm: 18, lengthCm: 22, weightGrams: 760,
     }, { publisher: publisher as never, store: database as never });
     expect(database.jobExecution.create).toHaveBeenCalledWith({ data: expect.objectContaining({
       entityType: 'SupplierProduct', entityId: 'product-1',

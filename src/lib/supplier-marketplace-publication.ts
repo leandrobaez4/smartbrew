@@ -9,6 +9,7 @@ import {
 } from './mercado-libre-publisher';
 import { portalDb } from './portal';
 import { PricingService } from './pricing';
+import { marketplacePackageAttributes, SupplierPackage } from './supplier-package';
 
 type ProductWithSupplier = SupplierProduct & { supplier: Supplier; pricing?: SupplierProductPricing | null };
 
@@ -20,6 +21,7 @@ export type PublishSupplierProductInput = {
   taxes: number;
   extraCosts: number;
   targetMarginPercentage: number;
+  packageDimensions: SupplierPackage;
 };
 
 type PublicationDependencies = {
@@ -111,13 +113,18 @@ export async function publishSupplierProduct(
       ?? configNumber('MINIMUM_PROFIT_PERCENTAGE', 20);
     const minimumProfitAmount = dependencies.minimumProfitAmount
       ?? configNumber('MINIMUM_PROFIT_AMOUNT', 0);
-    const pricing = product.pricing ? {
-      recommendedPrice: Number(product.pricing.finalPriceArs),
-      appliedMarginPercentage: Number(product.pricing.targetMarginPercentage),
-      netProfit: Number(product.pricing.targetProfitArs),
-      marginPercentage: Number(product.pricing.netMarginPercentage),
-      roi: Number(product.pricing.roiPercentage),
-    } : new PricingService({
+    const pricing = product.pricing ? new PricingService({
+      minimumMarginPercentage,
+      minimumProfitAmount,
+    }).calculate({
+      supplierCost: Number(product.pricing.supplierCostWithTaxesArs),
+      marketplaceFee: Number(product.pricing.marketplaceFixedFeeArs),
+      marketplaceFeePercentage: Number(product.pricing.marketplaceFeePercentage),
+      shippingCost: input.shippingCost,
+      taxes: 0,
+      extraCosts: Number(product.pricing.productSearchCostArs),
+      targetMarginPercentage: Number(product.pricing.targetMarginPercentage),
+    }) : new PricingService({
       minimumMarginPercentage,
       minimumProfitAmount,
     }).calculate({
@@ -162,7 +169,11 @@ export async function publishSupplierProduct(
       currencyId: product.currency!.trim(),
       quantity: product.stock!,
       images: validImages(product.images),
-      attributes: attributes(product.attributes),
+      attributes: [
+        ...attributes(product.attributes).filter((attribute) => !attribute.id.startsWith('SELLER_PACKAGE_')),
+        ...marketplacePackageAttributes(input.packageDimensions),
+      ],
+      listingTypeId: product.pricing?.marketplaceListingTypeId === 'gold_pro' ? 'gold_pro' : 'gold_special',
     });
     const synchronized = await syncListing({
       listingId: listing.id,

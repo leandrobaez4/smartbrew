@@ -13,6 +13,7 @@ import { syncMarketplaceStock } from './supplier-stock-sync';
 import { syncSupplierOrderStatuses } from './supplier-order-status-sync';
 import { monitorPublishedSupplierProducts } from './suppliers/monitor';
 import { syncSuppliers } from './suppliers/sync';
+import { SupplierPackageSchema } from './supplier-package';
 
 export const DropshippingJobName = {
   SupplierCatalogSyncJob: 'SupplierCatalogSyncJob',
@@ -40,7 +41,7 @@ const publishJob = z.object({
   targetMarginPercentage: z.number().finite().min(0).lt(100),
   automatic: z.boolean().optional(),
   executionId: z.string().optional(),
-}).strict();
+}).extend(SupplierPackageSchema.shape).strict();
 
 type JobData = Record<string, unknown> & { executionId?: string };
 type JobStore = Pick<typeof portalDb, 'jobExecution'>;
@@ -342,6 +343,12 @@ export async function executeDropshippingJob(
           taxes: data.taxes,
           extraCosts: data.extraCosts,
           targetMarginPercentage: data.targetMarginPercentage,
+          packageDimensions: {
+            heightCm: data.heightCm,
+            widthCm: data.widthCm,
+            lengthCm: data.lengthCm,
+            weightGrams: data.weightGrams,
+          },
         };
         return handlers.publishSupplierProduct(publication, {
           minimumMarginPercentage: settings.minimumMargin,

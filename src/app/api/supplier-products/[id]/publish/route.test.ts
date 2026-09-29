@@ -15,6 +15,10 @@ const validBody = {
   taxes: 500,
   extraCosts: 0,
   targetMarginPercentage: 20,
+  heightCm: 8,
+  widthCm: 18,
+  lengthCm: 22,
+  weightGrams: 760,
 };
 const request = (body: unknown = validBody) => new Request('http://localhost/api/supplier-products/product-1/publish', {
   method: 'POST',

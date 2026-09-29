@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { hasAdminApiSession } from '@/lib/admin-api';
 import { DropshippingJobName, enqueueDropshippingJob } from '@/lib/dropshipping-jobs';
 import { portalDb } from '@/lib/portal';
+import { SupplierPackageSchema } from '../../../../../lib/supplier-package';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ const bodySchema = z.object({
   taxes: z.number().finite().nonnegative(),
   extraCosts: z.number().finite().nonnegative(),
   targetMarginPercentage: z.number().finite().min(0).lt(100),
-}).strict();
+}).extend(SupplierPackageSchema.shape).strict();
 
 const validId = (value: string) => /^[a-zA-Z0-9_-]{1,128}$/.test(value);
 const failure = (error: string, status: number) => Response.json({ error }, {

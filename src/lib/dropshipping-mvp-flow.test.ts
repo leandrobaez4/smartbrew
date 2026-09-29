@@ -109,6 +109,7 @@ describe('dropshipping MVP critical flow', () => {
       taxes: 0,
       extraCosts: 0,
       targetMarginPercentage: 20,
+      packageDimensions: { heightCm: 8, widthCm: 18, lengthCm: 22, weightGrams: 760 },
     }, {
       findProduct: vi.fn().mockResolvedValue({ ...product, supplier, pricing: null }),
       publisher: { publish },

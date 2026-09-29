@@ -9,6 +9,7 @@ export type MarketplacePublicationInput = {
   quantity: number;
   images: string[];
   attributes: Array<{ id: string; value_name: string }>;
+  listingTypeId: 'gold_special' | 'gold_pro';
 };
 
 export interface MarketplacePublisher {
@@ -46,7 +47,22 @@ export class MercadoLibrePublisher implements MarketplacePublisher {
     });
   }
 
+  private async validateMercadoEnvios() {
+    if (!this.accountId) return;
+    if (this.accessToken !== undefined && !this.accessToken.trim()) throw new MarketplacePublicationError('Mercado Libre no está configurado.');
+    const accessToken = this.accessToken ?? await getMercadoLibreAccessToken({ accountId: this.accountId });
+    const response = await fetch(`${this.baseUrl}/users/${encodeURIComponent(this.accountId)}/shipping_preferences`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) throw new MarketplacePublicationError(`No se pudo validar Mercado Envíos (HTTP ${response.status}).`);
+    const preferences = await response.json() as { modes?: unknown };
+    if (!Array.isArray(preferences.modes) || !preferences.modes.includes('me2')) {
+      throw new MarketplacePublicationError('La cuenta de Mercado Libre no tiene Mercado Envíos habilitado.');
+    }
+  }
+
   async publish(input: MarketplacePublicationInput) {
+    await this.validateMercadoEnvios();
     const itemResponse = await this.request('/items', {
       title: input.title,
       category_id: input.categoryId,
@@ -54,7 +70,14 @@ export class MercadoLibrePublisher implements MarketplacePublisher {
       currency_id: input.currencyId,
       available_quantity: input.quantity,
       buying_mode: 'buy_it_now',
-      listing_type_id: 'gold_special',
+      condition: 'new',
+      listing_type_id: input.listingTypeId,
+      shipping: {
+        mode: 'me2',
+        local_pick_up: false,
+        free_shipping: false,
+        free_methods: [],
+      },
       attributes: input.attributes,
       pictures: input.images.map((source) => ({ source })),
     });

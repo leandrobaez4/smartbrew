@@ -79,7 +79,7 @@ export default function PricingCalculatorForm({
       <h2 className="text-lg font-bold">Costos y comisión de Mercado Libre</h2>
       <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <NumberField name="productSearchCostArs" label="Búsqueda / gestión del producto (ARS)" value={values.productSearchCostArs} onChange={updateNumber} />
-        <NumberField name="shippingCostArs" label="Envío (ARS)" value={values.shippingCostArs} onChange={updateNumber} />
+        <NumberField name="shippingCostArs" label="Costo a nuestro cargo si ML obliga (ARS)" value={values.shippingCostArs} onChange={updateNumber} />
         <NumberField name="marketplaceFeePercentage" label="Comisión Mercado Libre (%)" value={values.marketplaceFeePercentage} onChange={updateNumber} />
         <NumberField name="marketplaceFixedFeeArs" label="Cargo fijo Mercado Libre (ARS)" value={values.marketplaceFixedFeeArs} onChange={updateNumber} />
         <label className="text-sm font-medium">Categoría Mercado Libre
@@ -92,7 +92,7 @@ export default function PricingCalculatorForm({
           </select>
         </label>
       </div>
-      <p className="mt-3 text-xs text-gray-500">La categoría habilita la actualización periódica del porcentaje desde Mercado Libre. El envío y el cargo fijo siguen editables porque dependen de la logística y el peso facturable.</p>
+      <p className="mt-3 text-xs text-gray-500">Todas las publicaciones se despachan por Mercado Envíos (ME2), sin retiro en persona y con el envío a cargo del comprador. Mercado Libre calcula el importe; usá el costo anterior solo si la categoría o el precio obligan a subsidiarlo.</p>
     </section>
 
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">

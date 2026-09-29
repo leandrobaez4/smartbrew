@@ -14,6 +14,7 @@ const input = {
   quantity: 2,
   images: ['https://example.com/product.jpg'],
   attributes: [{ id: 'BRAND', value_name: 'Marca' }],
+  listingTypeId: 'gold_special' as const,
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -26,6 +27,11 @@ describe('MercadoLibrePublisher', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(new MercadoLibrePublisher('secret', 'https://api.test').publish(input)).resolves.toEqual({ marketplaceItemId: 'MLA123456' });
     expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://api.test/items', expect.objectContaining({ method: 'POST' }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      condition: 'new',
+      listing_type_id: 'gold_special',
+      shipping: { mode: 'me2', local_pick_up: false, free_shipping: false, free_methods: [] },
+    });
     expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://api.test/items/MLA123456/description', expect.objectContaining({
       body: JSON.stringify({ plain_text: 'Descripción' }),
     }));
@@ -50,6 +56,7 @@ describe('MercadoLibrePublisher', () => {
   it('loads the OAuth token for the account selected by the opportunity', async () => {
     oauth.token.mockResolvedValue('oauth-token');
     const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ modes: ['me2'] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'MLA123456' }), { status: 201 }))
       .mockResolvedValueOnce(new Response('{}', { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -58,5 +65,15 @@ describe('MercadoLibrePublisher', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://api.test/items', expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Bearer oauth-token' }),
     }));
+  });
+
+  it('blocks publication when the account does not support Mercado Envíos', async () => {
+    oauth.token.mockResolvedValue('oauth-token');
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ modes: ['custom'] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(new MercadoLibrePublisher(undefined, 'https://api.test', '84259783').publish(input))
+      .rejects.toThrow('no tiene Mercado Envíos habilitado');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

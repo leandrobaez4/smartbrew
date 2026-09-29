@@ -48,6 +48,7 @@ const request = {
   taxes: 500,
   extraCosts: 0,
   targetMarginPercentage: 20,
+  packageDimensions: { heightCm: 8, widthCm: 18, lengthCm: 22, weightGrams: 760 },
 };
 
 function dependencies(overrides: Record<string, unknown> = {}) {
@@ -70,8 +71,15 @@ describe('supplier marketplace publication', () => {
     const result = await publishSupplierProduct(request, deps);
     expect(deps.publisher.publish).toHaveBeenCalledWith(expect.objectContaining({
       title: 'Producto revisado', description: 'Descripción editorial revisada y aprobada para la publicación.', categoryId: 'MLA123', quantity: 3,
-      images: ['https://example.com/product.jpg'], attributes: [{ id: 'BRAND', value_name: 'Marca' }],
+      images: ['https://example.com/product.jpg'], attributes: [
+        { id: 'BRAND', value_name: 'Marca' },
+        { id: 'SELLER_PACKAGE_HEIGHT', value_name: '8 cm' },
+        { id: 'SELLER_PACKAGE_WIDTH', value_name: '18 cm' },
+        { id: 'SELLER_PACKAGE_LENGTH', value_name: '22 cm' },
+        { id: 'SELLER_PACKAGE_WEIGHT', value_name: '760 g' },
+      ],
       price: 8_750,
+      listingTypeId: 'gold_special',
     }));
     expect(deps.syncListing).toHaveBeenCalledWith(expect.objectContaining({
       listingId: 'listing-1', marketplaceItemId: 'MLA123456', status: MarketplaceListingStatus.ACTIVE,
@@ -90,14 +98,22 @@ describe('supplier marketplace publication', () => {
           netMarginPercentage: new Prisma.Decimal(25),
           roiPercentage: new Prisma.Decimal(19.33),
           totalCostArs: new Prisma.Decimal(10_345.67),
+          marketplaceListingTypeId: 'gold_pro',
+          supplierCostWithTaxesArs: new Prisma.Decimal(8_000),
+          marketplaceFixedFeeArs: new Prisma.Decimal(500),
+          marketplaceFeePercentage: new Prisma.Decimal(10),
+          productSearchCostArs: new Prisma.Decimal(1_000),
         },
       }),
     });
     await publishSupplierProduct(request, deps);
-    expect(deps.publisher.publish).toHaveBeenCalledWith(expect.objectContaining({ price: 12_345.67 }));
+    expect(deps.publisher.publish).toHaveBeenCalledWith(expect.objectContaining({
+      price: 15_384.62,
+      listingTypeId: 'gold_pro',
+    }));
   });
 
-  it('blocks a saved dashboard price that no longer reaches the configured minimum margin', async () => {
+  it('reprices a saved dashboard calculation to the configured minimum margin', async () => {
     const deps = dependencies({
       findProduct: vi.fn().mockResolvedValue({
         ...product,
@@ -108,12 +124,17 @@ describe('supplier marketplace publication', () => {
           netMarginPercentage: new Prisma.Decimal(15),
           roiPercentage: new Prisma.Decimal(17.65),
           totalCostArs: new Prisma.Decimal(8_500),
+          marketplaceListingTypeId: 'gold_special',
+          supplierCostWithTaxesArs: new Prisma.Decimal(8_000),
+          marketplaceFixedFeeArs: new Prisma.Decimal(500),
+          marketplaceFeePercentage: new Prisma.Decimal(10),
+          productSearchCostArs: new Prisma.Decimal(1_000),
         },
       }),
     });
 
-    await expect(publishSupplierProduct(request, deps)).rejects.toThrow('rentabilidad mínima');
-    expect(deps.publisher.publish).not.toHaveBeenCalled();
+    await publishSupplierProduct(request, deps);
+    expect(deps.publisher.publish).toHaveBeenCalledWith(expect.objectContaining({ price: 14_285.72 }));
   });
 
   it('validates and logs a publication without creating a listing or calling the marketplace in dry run', async () => {
