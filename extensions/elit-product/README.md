@@ -1,12 +1,17 @@
-# SmartBrew: extractor de productos de Elit
+# SmartBrew: importador de productos de proveedores
 
-La extensión extrae desde la pestaña activa los datos del producto y abre una pantalla de revisión en SmartBrew. Sólo guarda después de la confirmación del administrador y nunca realiza pedidos.
+La extensión selecciona un extractor registrado según la URL de la pestaña activa y abre una pantalla de revisión en SmartBrew. Sólo guarda después de la confirmación del administrador y nunca realiza pedidos.
+
+Proveedores registrados:
+
+- Elit: extracción operativa y compatible con el flujo existente.
+- Unidrop: URL reconocida; la extracción de la ficha se implementa por separado.
 
 ## Instalación y prueba manual
 
 1. Abrí `chrome://extensions` y activá **Modo de desarrollador**.
 2. Elegí **Cargar descomprimida** y seleccioná `extensions/elit-product`.
-3. Abrí un producto en `https://www.elit.com.ar/producto/...`.
+3. Abrí un producto compatible en Elit o Unidrop.
 4. Si tu cuenta de Elit permite ver precio y stock, iniciá sesión antes de extraer.
 5. Abrí la extensión y presioná **Extraer este producto**.
 6. Revisá el JSON y elegí **Configurar en SmartBrew**.

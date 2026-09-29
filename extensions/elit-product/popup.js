@@ -6,6 +6,7 @@ const send = document.querySelector('#send');
 const status = document.querySelector('#status');
 const result = document.querySelector('#result');
 let extractedProduct;
+let extractedSource;
 
 function encodePayload(value) {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
@@ -19,11 +20,13 @@ extract.addEventListener('click', async () => {
   copy.disabled = true;
   send.disabled = true;
   extractedProduct = undefined;
+  extractedSource = undefined;
   result.value = '';
   try {
     const response = await extractCurrentProduct(chrome, (message) => { status.textContent = message; });
     result.value = JSON.stringify(response.product, null, 2);
     extractedProduct = response.product;
+    extractedSource = response.source;
     status.textContent = response.message;
     copy.disabled = false;
     send.disabled = !canConfigureProduct(response.product);
@@ -35,10 +38,10 @@ extract.addEventListener('click', async () => {
 });
 
 send.addEventListener('click', async () => {
-  if (!extractedProduct) return;
+  if (!extractedProduct || !extractedSource) return;
   send.disabled = true;
-  const url = new URL('https://www.smartbrew.tech/admin/suppliers/elit-import');
-  url.searchParams.set('payload', encodePayload(createImportCommand(extractedProduct)));
+  const url = new URL(extractedSource.reviewPath, 'https://www.smartbrew.tech');
+  url.searchParams.set('payload', encodePayload(createImportCommand(extractedProduct, extractedSource.slug)));
   try {
     await chrome.tabs.create({ url: url.href });
     status.textContent = 'SmartBrew abierto para revisar los cálculos y confirmar el guardado.';
