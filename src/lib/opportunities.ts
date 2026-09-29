@@ -4,6 +4,7 @@ import { calculateProductScore } from './product-scoring';
 export type OpportunityProduct = {
   id: string;
   title: string;
+  sku?: string | null;
   category: string | null;
   cost: number | null;
   currency: string | null;
@@ -12,7 +13,7 @@ export type OpportunityProduct = {
   editorialTitle?: string | null;
   editorialStatus?: string;
   supplier: { id: string; name: string; status: string; lastSyncAt?: Date | null };
-  listings: Array<{ status: string }>;
+  listings: Array<{ status: string; marketplaceItemId?: string | null }>;
   history?: Array<{ cost: number | null }>;
   orderCount?: number;
 };

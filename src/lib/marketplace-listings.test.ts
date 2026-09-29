@@ -1,10 +1,10 @@
 import { MarketplaceListingStatus } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const db = vi.hoisted(() => ({ upsert: vi.fn(), update: vi.fn() }));
+const db = vi.hoisted(() => ({ upsert: vi.fn(), update: vi.fn(), findFirst: vi.fn() }));
 vi.mock('./portal', () => ({ portalDb: { marketplaceListing: db } }));
 
-import { linkMarketplaceListing, synchronizeMarketplaceListing } from './marketplace-listings';
+import { linkExternalMarketplaceListing, linkMarketplaceListing, synchronizeMarketplaceListing } from './marketplace-listings';
 
 describe('marketplace listings', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -54,5 +54,43 @@ describe('marketplace listings', () => {
     await expect(linkMarketplaceListing({ supplierProductId: '../bad', marketplace: 'ML', marketplaceAccountId: 'account' })).rejects.toThrow('supplier product');
     await expect(linkMarketplaceListing({ supplierProductId: 'product', marketplace: 'ML', marketplaceAccountId: 'account', price: -1 })).rejects.toThrow('price');
     expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse an MLA already linked to another product', async () => {
+    db.findFirst.mockResolvedValueOnce({ id: 'other-listing' });
+
+    await expect(linkExternalMarketplaceListing({
+      supplierProductId: 'product-1',
+      marketplaceAccountId: '84259783',
+      marketplaceItemId: 'MLA123456',
+      status: MarketplaceListingStatus.ACTIVE,
+      price: 24_999,
+    })).rejects.toThrow('listing-already-linked');
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('creates or updates the validated MLA with price, status and sync time', async () => {
+    const syncedAt = new Date('2026-09-29T18:00:00Z');
+    db.findFirst.mockResolvedValueOnce(null);
+    db.upsert.mockResolvedValueOnce({ id: 'listing-1' });
+
+    await linkExternalMarketplaceListing({
+      supplierProductId: 'product-1',
+      marketplaceAccountId: '84259783',
+      marketplaceItemId: 'MLA123456',
+      status: MarketplaceListingStatus.ACTIVE,
+      price: 24_999,
+      syncedAt,
+    });
+
+    expect(db.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        marketplaceItemId: 'MLA123456',
+        status: MarketplaceListingStatus.ACTIVE,
+        lastSyncAt: syncedAt,
+        publishedAt: syncedAt,
+      }),
+      update: expect.objectContaining({ marketplaceItemId: 'MLA123456', lastSyncAt: syncedAt }),
+    }));
   });
 });

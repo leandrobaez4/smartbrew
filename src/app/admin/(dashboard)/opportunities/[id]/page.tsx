@@ -22,7 +22,7 @@ export default async function SupplierProductEditorialPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; generated?: string; imported?: string; pricingSaved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; generated?: string; imported?: string; pricingSaved?: string; linked?: string; error?: string }>;
 }) {
   await requireAdmin();
   const [{ id }, query] = await Promise.all([params, searchParams]);
@@ -52,6 +52,7 @@ export default async function SupplierProductEditorialPage({
     {query.saved && <p className="rounded bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Contenido revisado y aprobado para publicar.</p>}
     {query.imported && <p className="rounded bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Producto de Elit y cálculo inicial guardados.</p>}
     {query.pricingSaved && <p className="rounded bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Costos, comisión, margen y precio final actualizados.</p>}
+    {query.linked && <p className="rounded bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Publicación de Mercado Libre vinculada y sincronizada.</p>}
     {query.generated && <p className="rounded bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">Contenido generado. Revisalo antes de aprobar.</p>}
     {(query.error || product.editorialError) && <p className="rounded bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">No se pudo procesar el contenido. {product.editorialError || 'Revisá todos los campos.'}</p>}
     {product.editorialStatus !== 'APPROVED' && <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"><p>Antes de publicar en Mercado Libre, revisá el título, la descripción y los datos generados.</p><a href="#contenido-publicar" className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white hover:bg-emerald-500">Ir a revisar y aprobar</a></div>}
@@ -60,6 +61,10 @@ export default async function SupplierProductEditorialPage({
       <h2 className="font-bold">Datos reales del proveedor</h2>
       <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2"><div><dt className="text-gray-500">Título</dt><dd>{product.title}</dd></div><div><dt className="text-gray-500">Marca / categoría</dt><dd>{product.brand || '—'} · {product.category || '—'}</dd></div><div><dt className="text-gray-500">Identificadores</dt><dd>ID {product.externalId} · SKU {product.sku || '—'} · EAN {product.ean || '—'}</dd></div><div><dt className="text-gray-500">Fuente editorial</dt><dd>{product.supplier.integrationType === 'API' ? `API de ${product.supplier.name}` : `Snapshot importado de ${product.supplier.name}`} · actualizado {product.lastSyncAt.toLocaleString('es-AR')}</dd></div><div className="md:col-span-2"><dt className="text-gray-500">Descripción</dt><dd className="whitespace-pre-wrap">{product.description || '—'}</dd></div><div className="md:col-span-2"><dt className="text-gray-500">Atributos</dt><dd className="overflow-auto whitespace-pre-wrap font-mono text-xs">{JSON.stringify(product.attributes, null, 2)}</dd></div></dl>
     </section>
+
+    {product.supplier.slug === 'unidrop' && <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">Vínculo con Mercado Libre</h2>{listing?.marketplaceItemId ? <p className="mt-1 text-sm">SKU <strong>{product.sku || '—'}</strong> · MLA <a href={`https://articulo.mercadolibre.com.ar/${listing.marketplaceItemId}`} target="_blank" rel="noreferrer" className="font-semibold text-blue-600 hover:underline dark:text-blue-400">{listing.marketplaceItemId}</a> · {listing.status}</p> : <p className="mt-1 text-sm text-gray-500">SKU {product.sku || '—'} todavía sin publicación asociada.</p>}</div><Link href={`/admin/opportunities/${product.id}/link-listing`} className="rounded bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-500">{listing?.marketplaceItemId ? 'Revalidar vínculo' : 'Vincular por SELLER_SKU'}</Link></div>
+    </section>}
 
     {product.pricing && <section className="space-y-4">
       <div><h2 className="text-2xl font-bold">Calculadora de publicación</h2><p className="mt-1 text-sm text-gray-500">Todos los importes pueden revisarse y configurarse desde SmartBrew.</p></div>

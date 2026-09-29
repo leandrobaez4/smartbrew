@@ -52,6 +52,7 @@ export default async function ManualPublicationPage({ params }: { params: Promis
     <div><Link href={opportunityHref} className="text-sm font-semibold text-blue-600 dark:text-blue-400">← Volver a la oportunidad</Link><p className="mt-3 text-sm font-semibold text-yellow-600">Unidrop · Publicación manual</p><h1 className="text-2xl font-bold">Paquete para Mercado Libre</h1><p className="mt-1 text-sm text-gray-500">SmartBrew no publicará automáticamente. Copiá los datos y cargalos en Mercado Libre.</p></div>
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
       <ManualPublicationActions publication={publication} />
+      <Link href={`/admin/opportunities/${product.id}/link-listing`} className="mt-4 inline-block text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400">Ya la publiqué: vincular por SELLER_SKU →</Link>
     </section>
     <section className="grid gap-4 md:grid-cols-2">
       <Card title="Contenido revisado"><Field label="Título" value={publication.title} /><Field label="Descripción" value={publication.description} multiline /></Card>

@@ -67,3 +67,47 @@ export async function synchronizeMarketplaceListing(input: {
     },
   });
 }
+
+export async function linkExternalMarketplaceListing(input: {
+  supplierProductId: string;
+  marketplaceAccountId: string;
+  marketplaceItemId: string;
+  status: MarketplaceListingStatus;
+  price: number;
+  syncedAt?: Date;
+}) {
+  const supplierProductId = identifier('supplier product id', input.supplierProductId);
+  const marketplaceAccountId = identifier('marketplace account id', input.marketplaceAccountId);
+  const marketplaceItemId = identifier('marketplace item id', input.marketplaceItemId);
+  const reused = await portalDb.marketplaceListing.findFirst({
+    where: {
+      marketplace: 'MERCADO_LIBRE',
+      marketplaceAccountId,
+      marketplaceItemId,
+      supplierProductId: { not: supplierProductId },
+    },
+    select: { id: true },
+  });
+  if (reused) throw new Error('listing-already-linked');
+  const syncedAt = input.syncedAt || new Date();
+  return portalDb.marketplaceListing.upsert({
+    where: { supplierProductId_marketplace_marketplaceAccountId: { supplierProductId, marketplace: 'MERCADO_LIBRE', marketplaceAccountId } },
+    create: {
+      supplierProductId,
+      marketplace: 'MERCADO_LIBRE',
+      marketplaceAccountId,
+      marketplaceItemId,
+      price: price(input.price),
+      status: input.status,
+      lastSyncAt: syncedAt,
+      publishedAt: input.status === MarketplaceListingStatus.ACTIVE ? syncedAt : undefined,
+    },
+    update: {
+      marketplaceItemId,
+      price: price(input.price),
+      status: input.status,
+      lastSyncAt: syncedAt,
+      publishedAt: input.status === MarketplaceListingStatus.ACTIVE ? syncedAt : undefined,
+    },
+  });
+}
