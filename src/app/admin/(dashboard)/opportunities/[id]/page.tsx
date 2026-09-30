@@ -9,6 +9,7 @@ import { approveSupplierEditorialAction, generateSupplierEditorialAction, update
 import { getDropshippingSettings } from '@/lib/dropshipping-settings';
 import { supplierSnapshotFreshness, supplierSourceUrl } from '@/lib/supplier-snapshot-freshness';
 import GenerateEditorialForm from './GenerateEditorialForm';
+import ApproveEditorialButton from './ApproveEditorialButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -135,7 +136,7 @@ export default async function SupplierProductEditorialPage({
         <label className="block text-sm font-medium">Destacados, uno por línea<textarea name="productHighlights" className={inputClass} rows={7} defaultValue={textList(product.editorialHighlights)} required /></label>
       </div>
       <label className="block text-sm font-medium">Palabras SEO, una por línea<textarea name="seoKeywords" className={inputClass} rows={5} defaultValue={product.editorialSeoKeywords.join('\n')} required /></label>
-      <button className="rounded bg-emerald-600 px-5 py-2 font-semibold text-white hover:bg-emerald-500">Guardar y aprobar contenido</button>
+      <ApproveEditorialButton />
     </form>
   </main>;
 }
