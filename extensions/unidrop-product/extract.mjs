@@ -139,3 +139,4 @@ export function extractUnidropProduct() {
       : `${products.length} variantes extraídas. Elegí una variante antes de configurar en SmartBrew.`,
   };
 }
+

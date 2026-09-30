@@ -1,6 +1,6 @@
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractUnidropProduct } from './extractors/unidrop.mjs';
+import { extractUnidropProduct } from './extract.mjs';
 
 afterEach(() => {
   delete globalThis.location;
@@ -118,3 +118,4 @@ test('refuses unrelated origins and catalogue list pages', () => {
     assert.equal(extractUnidropProduct().ok, false);
   }
 });
+
