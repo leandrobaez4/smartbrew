@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "SmartBrew · Importar desde Unidrop",
-  "version": "0.1.0",
+  "name": "U · Unidrop para SmartBrew",
+  "version": "0.1.1",
   "description": "Extrae productos y variantes de Unidrop para configurarlos en SmartBrew.",
   "permissions": ["activeTab", "scripting"],
-  "action": { "default_popup": "popup.html" }
+  "action": {
+    "default_title": "U · Importar producto de Unidrop",
+    "default_popup": "popup.html"
+  }
 }
