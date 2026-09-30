@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { Loader2 } from 'lucide-react';
 import { calculateSupplierProductPricing } from '@/lib/supplier-product-pricing';
 
 export type PricingValues = {
@@ -141,8 +143,37 @@ export default function SupplierPricingCalculatorForm({
       </dl> : <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">Revisá los valores: no se puede calcular el precio final.</p>}
     </section>
 
-    <button type="submit" disabled={!calculation} className="rounded-md bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">{submitLabel}</button>
+    <SaveWithLoadingButton disabled={!calculation} submitLabel={submitLabel} />
   </form>;
+}
+
+function SaveWithLoadingButton({ disabled, submitLabel }: { disabled: boolean; submitLabel: string }) {
+  const { pending } = useFormStatus();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const opportunity = submitLabel.toLocaleLowerCase('es').includes('oportunidad');
+  const pendingTitle = opportunity ? 'Guardando oportunidad…' : 'Guardando cambios…';
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (pending && !element.open) element.showModal();
+    if (!pending && element.open) element.close();
+    return () => { if (element.open) element.close(); };
+  }, [pending]);
+
+  return <>
+    <button type="submit" disabled={disabled || pending} className="rounded-md bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+      {pending ? 'Guardando…' : submitLabel}
+    </button>
+    <dialog ref={dialog} aria-label={opportunity ? 'Guardando oportunidad' : 'Guardando cambios'} aria-busy={pending}
+      onCancel={(event) => event.preventDefault()}
+      className="m-auto rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+      <div role="status" aria-live="polite" className="flex max-w-sm flex-col items-center gap-4">
+        <Loader2 aria-hidden="true" className="h-10 w-10 animate-spin text-emerald-600" />
+        <p className="text-lg font-semibold">{pendingTitle}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Estamos procesando el producto y sus cálculos. Esperá un momento.</p>
+      </div>
+    </dialog>
+  </>;
 }
 
 function NumberField({ name, label, value, onChange, required = true }: {
