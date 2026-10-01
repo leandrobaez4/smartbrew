@@ -288,7 +288,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .selection-process { background: var(--cream); color: var(--ink); }
 .selection-process .section-kicker { color: #8b5c34; }
 .selection-process .section-heading > p { color: #59605f; }
-.selection-process-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.selection-process-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
 .selection-process-grid article { display: grid; grid-template-columns: 1fr auto; min-height: 300px; align-content: start; padding: 30px; border: 1px solid rgba(10,17,18,.16); background: rgba(255,255,255,.35); }
 .selection-process-grid svg { color: #8b5c34; }
 .selection-process-grid span { color: #737a78; font-family: var(--font-geist-mono),monospace; font-size: .72rem; }

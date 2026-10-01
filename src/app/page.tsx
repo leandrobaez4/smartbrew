@@ -4,7 +4,6 @@ import { PrismaClient } from "@prisma/client";
 import {
   ArrowRight,
   ArrowUpRight,
-  BadgeDollarSign,
   Cable,
   Coffee,
   Cpu,
@@ -239,12 +238,6 @@ export default async function Home() {
             <span>02</span>
             <h3>Comprás en Mercado Libre</h3>
             <p>El enlace te lleva al sitio del vendedor, donde revisás precio, envío y condiciones antes de comprar.</p>
-          </article>
-          <article>
-            <BadgeDollarSign aria-hidden="true" size={28} />
-            <span>03</span>
-            <h3>Podemos recibir una comisión</h3>
-            <p>Si comprás desde un enlace afiliado, SmartBrew puede recibir una comisión sin costo adicional para vos.</p>
           </article>
         </div>
       </section>
