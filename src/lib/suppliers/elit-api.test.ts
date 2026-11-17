@@ -66,6 +66,7 @@ describe('Elit API adapter', () => {
         supplierMarkupPercentage: 30,
       },
     });
+    expect(normalizeElitApiProduct({ ...apiProduct, ean: 9780201379624 }).ean).toBe('9780201379624');
   });
 
   it('queries only the requested product and keeps credentials out of the URL', async () => {
@@ -74,9 +75,30 @@ describe('Elit API adapter', () => {
 
     await expect(connector.getProduct('6358')).resolves.toMatchObject({ externalId: '6358', stock: 8 });
     const [url, request] = fetcher.mock.calls[0] as [URL, RequestInit];
-    expect(url.toString()).toContain('/productos?limit=1&offset=0&id=6358');
+    expect(url.toString()).toContain('/productos?limit=1&id=6358');
+    expect(url.searchParams.has('offset')).toBe(false);
     expect(url.toString()).not.toContain('secret-token');
     expect(JSON.parse(String(request.body))).toEqual({ user_id: 31916, token: 'secret-token' });
+  });
+
+  it('searches a bounded page by product name or code without downloading the catalog', async () => {
+    const fetcher = vi.fn().mockImplementation(async () => response());
+    const connector = new ElitApiConnector(config, fetcher);
+
+    await expect(connector.searchProducts('nombre', 'Logitech', 20)).resolves.toMatchObject({
+      total: 1,
+      products: [{ externalId: '6358', cost: 20_108.5 }],
+    });
+    expect(String(fetcher.mock.calls[0][0])).toContain('/productos?limit=20&offset=20&nombre=Logitech');
+
+    await connector.searchProducts('codigo_producto', '981-000612');
+    expect(String(fetcher.mock.calls[1][0])).toContain('codigo_producto=981-000612');
+    expect((fetcher.mock.calls[1][0] as URL).searchParams.has('offset')).toBe(false);
+    expect(String(fetcher.mock.calls[1][0])).not.toContain('secret-token');
+    await expect(connector.searchProducts('id', 'not-a-number')).rejects.toThrow('numeric');
+    await expect(connector.searchProducts('nombre', 'x')).rejects.toThrow('Invalid Elit search query');
+    await expect(connector.searchProducts('nombre', 'Logitech', 10_001)).rejects.toThrow('Invalid Elit search query');
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
   it('registers targeted monitoring capabilities without enabling full catalog downloads', async () => {

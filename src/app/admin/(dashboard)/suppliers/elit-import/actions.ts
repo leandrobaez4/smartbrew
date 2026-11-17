@@ -23,7 +23,7 @@ export async function importElitProductAction(payload: string, formData: FormDat
       name: 'Elit', slug: 'elit', website: 'https://www.elit.com.ar', type: 'elit-snapshot-v1',
       integrationType: SupplierIntegrationType.SCRAPING, status: SupplierStatus.ACTIVE, lastSyncAt: syncedAt,
     },
-    update: { type: 'elit-snapshot-v1', lastSyncAt: syncedAt },
+    update: { lastSyncAt: syncedAt },
   });
   const connector = supplierConnectorFactory.make({
     ...supplierConnectorConfig(supplier),

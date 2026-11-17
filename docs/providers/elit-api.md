@@ -20,9 +20,14 @@ Admite filtros por `id`, `codigo_alfa`, `codigo_producto`, nombre, marca,
 categoría y subcategoría. La paginación usa `limit` (máximo 100) y `offset`.
 También acepta `actualizacion=AAAA-MM-DD HH:MM`.
 
-SmartBrew no descarga el catálogo completo. `elit-v1` consulta únicamente por
-`id` los productos que SmartBrew ya monitorea y declara capacidades `product`,
-`price` y `stock`, pero no `catalog`.
+SmartBrew no descarga el catálogo completo. Para el monitoreo, `elit-v1`
+consulta por `id` únicamente los productos que SmartBrew ya conoce y declara
+capacidades `product`, `price` y `stock`, pero no `catalog`.
+
+El buscador administrativo consulta `/productos` bajo demanda, con filtro por
+`nombre`, `codigo_producto`, `codigo_alfa` o `id` y páginas de hasta 20 resultados.
+Seleccionar un resultado abre la calculadora de precios existente; el producto
+solo se incorpora al catálogo local cuando el administrador guarda la cotización.
 
 Campos normalizados:
 

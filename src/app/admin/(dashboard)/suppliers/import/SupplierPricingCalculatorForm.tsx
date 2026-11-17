@@ -56,7 +56,7 @@ export default function SupplierPricingCalculatorForm({
   return <form action={action} className="space-y-6">
     <section className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
       <h2 className="text-lg font-bold">Costo de {supplierLabel}</h2>
-      <p className="mt-1 text-sm text-gray-500">Estos valores llegan desde la extensión y se pueden corregir antes de guardar.</p>
+      <p className="mt-1 text-sm text-gray-500">Estos valores llegan desde el proveedor y se pueden corregir antes de guardar.</p>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <input type="hidden" name="supplierCurrency" value={values.supplierCurrency} />
         {values.supplierCurrency === 'USD' ? <>

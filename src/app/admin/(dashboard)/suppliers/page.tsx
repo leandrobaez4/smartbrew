@@ -16,7 +16,7 @@ export default async function SuppliersPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Proveedores</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Integraciones externas y sincronización de catálogos.</p>
         </div>
-        <Link href="/admin/suppliers/new" className="rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">Nuevo proveedor</Link>
+        <div className="flex flex-wrap gap-2"><Link href="/admin/suppliers/elit-search" className="rounded-md border border-blue-300 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300">Buscar en Elit</Link><Link href="/admin/suppliers/new" className="rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">Nuevo proveedor</Link></div>
       </div>
 
       {suppliers.length ? (

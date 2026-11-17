@@ -32,7 +32,7 @@ export const ElitApiProductSchema = z.object({
   stock_total: z.number().int().nonnegative().nullable().optional(),
   stock_deposito_cliente: z.number().int().nonnegative().nullable().optional(),
   stock_deposito_cd: z.number().int().nonnegative().nullable().optional(),
-  ean: z.string().trim().nullable().optional(),
+  ean: z.union([z.string(), z.number().int().nonnegative()]).transform((value) => String(value).trim()).nullable().optional(),
   peso: z.number().finite().nonnegative().nullable().optional(),
   garantia: z.string().trim().nullable().optional(),
   imagenes: z.array(z.string().trim().min(1)).default([]),
@@ -53,6 +53,9 @@ const ElitApiResponseSchema = z.object({
   }).optional(),
   resultado: z.array(ElitApiProductSchema),
 });
+
+export const ElitSearchFieldSchema = z.enum(['nombre', 'codigo_producto', 'codigo_alfa', 'id']);
+export type ElitSearchField = z.infer<typeof ElitSearchFieldSchema>;
 
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -148,14 +151,14 @@ export class ElitApiConnector implements SupplierConnector {
     this.token = secret.token;
   }
 
-  private async requestProduct(externalId: string) {
-    if (!/^\d{1,12}$/.test(externalId)) throw new Error('Elit product id must be numeric.');
+  private async requestProducts(field: ElitSearchField, value: string, limit: number, offset: number) {
     const url = new URL(`${this.baseUrl}/productos`);
-    url.searchParams.set('limit', '1');
-    url.searchParams.set('offset', '0');
-    url.searchParams.set('id', externalId);
+    url.searchParams.set('limit', String(limit));
+    if (offset > 0) url.searchParams.set('offset', String(offset));
+    url.searchParams.set(field, value);
     const response = await this.fetcher(url, {
       method: 'POST',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: this.userId, token: this.token }),
       signal: AbortSignal.timeout(this.timeoutMs),
@@ -163,7 +166,22 @@ export class ElitApiConnector implements SupplierConnector {
     if (!response.ok) throw new Error(`Elit API request failed with status ${response.status}.`);
     const payload = ElitApiResponseSchema.parse(await response.json());
     if (payload.codigo !== 200) throw new Error(`Elit API returned code ${payload.codigo}.`);
-    return payload.resultado[0] ? normalizeElitApiProduct(payload.resultado[0]) : null;
+    return { products: payload.resultado.map(normalizeElitApiProduct), total: payload.paginador?.total ?? payload.resultado.length };
+  }
+
+  async searchProducts(field: ElitSearchField, query: string, offset = 0) {
+    const value = query.trim();
+    if (value.length < 2 || value.length > 80 || !Number.isSafeInteger(offset) || offset < 0 || offset > 10_000) {
+      throw new Error('Invalid Elit search query.');
+    }
+    if (field === 'id' && !/^\d{1,12}$/.test(value)) throw new Error('Elit product id must be numeric.');
+    return this.requestProducts(field, value, 20, offset);
+  }
+
+  private async requestProduct(externalId: string) {
+    if (!/^\d{1,12}$/.test(externalId)) throw new Error('Elit product id must be numeric.');
+    const result = await this.requestProducts('id', externalId, 1, 0);
+    return result.products.find((product) => product.externalId === externalId) ?? null;
   }
 
   async getProduct(externalId: string) { return this.requestProduct(externalId); }
